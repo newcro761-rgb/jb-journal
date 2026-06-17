@@ -451,19 +451,24 @@
     }
     el.innerHTML = '<div class="plan-grid-outer">' + plans.map(p => {
       const has2 = p.b2 && p.q2;
-      const sl1  = p.custSL ? p.custSL : Math.round(p.b1 * 0.93);
+      const auto1SL = Math.round(p.b1 * 0.93);
+      const sl1  = p.custSL ? p.custSL : auto1SL;
       const t1   = Math.round(p.b1 * 1.03);
       const t2   = Math.round(p.b1 * 1.05);
       const t3   = Math.round(p.b1 * 1.07);
+      const sl1Ref = p.custSL ? `<div class="pc-row"><span class="pc-lbl" style="color:var(--muted)">-7%</span><span class="pc-val" style="color:var(--muted);font-size:10px;">${auto1SL.toLocaleString('ko-KR')}</span></div>` : '';
 
       let sec2 = '';
       if (has2) {
         const avg = (p.b1*p.q1 + p.b2*p.q2) / (p.q1+p.q2);
-        const sl2 = p.custSL ? p.custSL : Math.round(avg * 0.93);
+        const autoAvgSL = Math.round(avg * 0.93);
+        const sl2 = p.custSL ? p.custSL : autoAvgSL;
+        const sl2Ref = p.custSL ? `<div class="pc-row"><span class="pc-lbl" style="color:var(--muted)">-7%</span><span class="pc-val" style="color:var(--muted);font-size:10px;">${autoAvgSL.toLocaleString('ko-KR')}</span></div>` : '';
         sec2 = `
           <hr class="pc-divider">
           <div class="pc-row"><span class="pc-lbl" style="color:var(--orange)">평균</span><span class="pc-val orange">${w(avg)}</span></div>
           <div class="pc-row"><span class="pc-lbl">2차손절</span><span class="pc-val red">${w(sl2)}</span></div>
+          ${sl2Ref}
           <div class="pc-row"><span class="pc-lbl">+3%</span><span class="pc-val green">${Math.round(avg*1.03).toLocaleString('ko-KR')}</span></div>
           <div class="pc-row"><span class="pc-lbl">+5%</span><span class="pc-val green">${Math.round(avg*1.05).toLocaleString('ko-KR')}</span></div>
           <div class="pc-row"><span class="pc-lbl">+7%</span><span class="pc-val green">${Math.round(avg*1.07).toLocaleString('ko-KR')}</span></div>`;
@@ -476,6 +481,7 @@
           <div class="pc-code">${p.code || p.date}</div>
           <div class="pc-row"><span class="pc-lbl">1차</span><span class="pc-val">${p.b1.toLocaleString('ko-KR')}</span></div>
           <div class="pc-row"><span class="pc-lbl">손절</span><span class="pc-val red">${sl1.toLocaleString('ko-KR')}</span></div>
+          ${sl1Ref}
           <div class="pc-row"><span class="pc-lbl">+3%</span><span class="pc-val green">${t1.toLocaleString('ko-KR')}</span></div>
           <div class="pc-row"><span class="pc-lbl">+5%</span><span class="pc-val green">${t2.toLocaleString('ko-KR')}</span></div>
           <div class="pc-row"><span class="pc-lbl">+7%</span><span class="pc-val green">${t3.toLocaleString('ko-KR')}</span></div>
