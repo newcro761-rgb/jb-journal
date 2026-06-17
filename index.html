@@ -217,6 +217,64 @@
       border: none; border-top: 1px solid var(--border);
       margin: 4px 0 10px;
     }
+
+    /* 계획 카드 */
+    .plan-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 14px;
+      overflow: hidden;
+    }
+    .plan-card-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,0.03);
+    }
+    .plan-card-title {
+      font-size: 16px; font-weight: 700; color: var(--text);
+    }
+    .plan-card-code {
+      font-size: 12px; color: var(--muted); margin-top: 2px;
+    }
+    .plan-del-btn {
+      background: rgba(255,71,87,0.15); border: 1px solid rgba(255,71,87,0.4);
+      color: var(--red); border-radius: 6px; padding: 5px 10px;
+      font-size: 12px; cursor: pointer;
+    }
+    .plan-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      border-top: 1px solid var(--border);
+    }
+    .plan-col {
+      padding: 12px 14px;
+    }
+    .plan-col:first-child {
+      border-right: 1px solid var(--border);
+    }
+    .plan-col-title {
+      font-size: 11px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    .plan-col-title.blue { color: #7eb8f7; }
+    .plan-col-title.orange { color: var(--orange); }
+    .plan-row {
+      display: flex; justify-content: space-between;
+      font-size: 13px; padding: 4px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .plan-row:last-child { border-bottom: none; }
+    .plan-row-label { color: var(--muted); font-size: 12px; }
+    .plan-row-val { font-weight: 600; }
+    .plan-row-val.red   { color: var(--red); }
+    .plan-row-val.green { color: var(--green); }
+    .plan-row-val.orange { color: var(--orange); }
+    .plan-empty {
+      text-align: center; color: var(--muted);
+      padding: 32px 16px; font-size: 14px;
+    }
   </style>
 </head>
 <body>
@@ -476,105 +534,49 @@
   <!-- ======== 탭 4: 매매 계획 ======== -->
   <div id="tab-plan" class="tab-content">
     <div class="page-title">매매 계획</div>
-    <p style="color:var(--muted);font-size:13px;margin-bottom:14px;">전날 밤 계획 입력 → 당일 오전 빠른 참고</p>
 
-    <!-- 입력 -->
+    <!-- 종목 추가 폼 -->
     <div class="section">
-      <div class="section-title">진입 계획</div>
+      <div class="section-title">종목 추가</div>
       <div class="row2">
         <div>
-          <label>1차 매수가 (1선)</label>
-          <input type="number" id="p-buy1" placeholder="10000" oninput="calcPlan()">
+          <label>종목명</label>
+          <input type="text" id="p-name" placeholder="삼성전자">
         </div>
         <div>
-          <label>1차 수량</label>
-          <input type="number" id="p-qty1" placeholder="100" oninput="calcPlan()">
+          <label>종목코드</label>
+          <input type="text" id="p-code" placeholder="005930">
         </div>
       </div>
       <div class="row2" style="margin-top:8px;">
         <div>
-          <label>2차 매수가 (2선)</label>
-          <input type="number" id="p-buy2" placeholder="9500" oninput="calcPlan()">
+          <label>1차 매수가 (1선)</label>
+          <input type="number" id="p-buy1" placeholder="10000">
         </div>
         <div>
-          <label>2차 수량</label>
-          <input type="number" id="p-qty2" placeholder="100" oninput="calcPlan()">
+          <label>1차 수량</label>
+          <input type="number" id="p-qty1" placeholder="100">
         </div>
       </div>
+      <div class="row2" style="margin-top:8px;">
+        <div>
+          <label>2차 매수가 (2선, 선택)</label>
+          <input type="number" id="p-buy2" placeholder="9500">
+        </div>
+        <div>
+          <label>2차 수량 (선택)</label>
+          <input type="number" id="p-qty2" placeholder="100">
+        </div>
+      </div>
+      <div style="margin-top:8px;">
+        <label>커스텀 손절가 (비우면 −7% 자동)</label>
+        <input type="number" id="p-custom-sl" placeholder="예: 9200 (직접 지정 시)">
+      </div>
+      <button class="save-btn" style="margin-top:12px;" onclick="addPlan()">+ 목록에 추가</button>
     </div>
 
-    <!-- 1차만 진입 시 -->
-    <div class="calc-section">
-      <div class="section-title" style="color:#7eb8f7;">1차만 진입 시</div>
-      <div class="calc-row">
-        <span class="calc-label">🔴 손절가 (−7%)</span>
-        <span class="calc-val red" id="p1-sl">—</span>
-      </div>
-      <div class="calc-row">
-        <span class="calc-label">🟢 1차 매도 (+3%)</span>
-        <span class="calc-val green" id="p1-t1">—</span>
-      </div>
-      <div class="calc-row">
-        <span class="calc-label">🟢 2차 매도 (+5%)</span>
-        <span class="calc-val green" id="p1-t2">—</span>
-      </div>
-      <div class="calc-row">
-        <span class="calc-label">🟢 3차 매도 (+7%)</span>
-        <span class="calc-val green" id="p1-t3">—</span>
-      </div>
-      <div class="calc-row" style="margin-top:6px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.1);">
-        <span class="calc-label">최대 손실액</span>
-        <span class="calc-val red" id="p1-loss">—</span>
-      </div>
-    </div>
-
-    <!-- 1차+2차 진입 시 -->
-    <div class="calc-section" style="border-color:rgba(255,165,2,0.3);">
-      <div class="section-title" style="color:var(--orange);">2차까지 진입 시 (재세팅)</div>
-      <div class="calc-row">
-        <span class="calc-label">평균단가</span>
-        <span class="calc-val orange" id="p2-avg">—</span>
-      </div>
-      <div class="calc-row">
-        <span class="calc-label">🔴 재세팅 손절가 (−7%)</span>
-        <span class="calc-val red" id="p2-sl">—</span>
-      </div>
-      <div class="calc-row">
-        <span class="calc-label">🟢 1차 매도 (+3%)</span>
-        <span class="calc-val green" id="p2-t1">—</span>
-      </div>
-      <div class="calc-row">
-        <span class="calc-label">🟢 2차 매도 (+5%)</span>
-        <span class="calc-val green" id="p2-t2">—</span>
-      </div>
-      <div class="calc-row">
-        <span class="calc-label">🟢 3차 매도 (+7%)</span>
-        <span class="calc-val green" id="p2-t3">—</span>
-      </div>
-      <div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.1);">
-        <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">분할 매도 수량</div>
-        <div class="calc-row">
-          <span class="calc-label">총 수량</span>
-          <span class="calc-val" id="p2-total">—</span>
-        </div>
-        <div class="calc-row">
-          <span class="calc-label">1차 매도 (40%)</span>
-          <span class="calc-val" id="p2-s1">—</span>
-        </div>
-        <div class="calc-row">
-          <span class="calc-label">2차 매도 (잔여 67%)</span>
-          <span class="calc-val" id="p2-s2">—</span>
-        </div>
-        <div class="calc-row">
-          <span class="calc-label">3차 매도 (나머지)</span>
-          <span class="calc-val" id="p2-s3">—</span>
-        </div>
-        <div class="calc-row" style="margin-top:6px;">
-          <span class="calc-label">최대 손실액</span>
-          <span class="calc-val red" id="p2-loss">—</span>
-        </div>
-      </div>
-    </div>
+    <!-- 대기 목록 -->
+    <div id="plan-list"></div>
   </div>
 
   <!-- ======== 탭 3: 시트 열기 ======== -->
@@ -793,45 +795,118 @@
     calcAll();
   }
 
-  /* ── 탭4: 매매 계획 계산기 ── */
-  function calcPlan() {
-    const b1 = n('p-buy1'), q1 = n('p-qty1');
-    const b2 = n('p-buy2'), q2 = n('p-qty2');
+  /* ── 탭4: 매매 계획 목록 ── */
+  function loadPlans() {
+    return JSON.parse(localStorage.getItem('jb-plans') || '[]');
+  }
+  function savePlans(plans) {
+    localStorage.setItem('jb-plans', JSON.stringify(plans));
+  }
 
-    // 1차만 진입 시
-    if (b1 > 0) {
-      set('p1-sl',   Math.round(b1 * 0.93).toLocaleString('ko-KR') + '원');
-      set('p1-t1',   Math.round(b1 * 1.03).toLocaleString('ko-KR') + '원');
-      set('p1-t2',   Math.round(b1 * 1.05).toLocaleString('ko-KR') + '원');
-      set('p1-t3',   Math.round(b1 * 1.07).toLocaleString('ko-KR') + '원');
-      set('p1-loss', q1 > 0 ? Math.round(b1 * q1 * 0.07).toLocaleString('ko-KR') + '원' : '—');
-    } else {
-      ['p1-sl','p1-t1','p1-t2','p1-t3','p1-loss'].forEach(id => set(id, '—'));
+  function addPlan() {
+    const name   = document.getElementById('p-name').value.trim();
+    const code   = document.getElementById('p-code').value.trim();
+    const b1     = parseFloat(document.getElementById('p-buy1').value) || 0;
+    const q1     = parseFloat(document.getElementById('p-qty1').value) || 0;
+    const b2     = parseFloat(document.getElementById('p-buy2').value) || 0;
+    const q2     = parseFloat(document.getElementById('p-qty2').value) || 0;
+    const custSL = parseFloat(document.getElementById('p-custom-sl').value) || 0;
+
+    if (!name || !b1 || !q1) {
+      showToast('종목명, 1차 매수가, 1차 수량은 필수입니다.');
+      return;
     }
 
-    // 1차+2차 진입 시
-    if (b1 > 0 && q1 > 0 && b2 > 0 && q2 > 0) {
-      const avg      = (b1*q1 + b2*q2) / (q1+q2);
-      const totalQty = q1 + q2;
-      const totalAmt = b1*q1 + b2*q2;
-      const s1       = Math.round(totalQty * 0.4);
-      const s2       = Math.round((totalQty - s1) * 0.67);
-      const s3       = totalQty - s1 - s2;
+    const plans = loadPlans();
+    plans.unshift({
+      id: Date.now(),
+      date: new Date().toLocaleDateString('ko-KR'),
+      name, code, b1, q1,
+      b2: b2 || null, q2: q2 || null,
+      custSL: custSL || null
+    });
+    savePlans(plans);
+    renderPlans();
 
-      set('p2-avg',   Math.round(avg).toLocaleString('ko-KR') + '원');
-      set('p2-sl',    Math.round(avg * 0.93).toLocaleString('ko-KR') + '원');
-      set('p2-t1',    Math.round(avg * 1.03).toLocaleString('ko-KR') + '원');
-      set('p2-t2',    Math.round(avg * 1.05).toLocaleString('ko-KR') + '원');
-      set('p2-t3',    Math.round(avg * 1.07).toLocaleString('ko-KR') + '원');
-      set('p2-total', totalQty + '주');
-      set('p2-s1',    s1 + '주');
-      set('p2-s2',    s2 + '주');
-      set('p2-s3',    s3 + '주');
-      set('p2-loss',  Math.round(totalAmt * 0.07).toLocaleString('ko-KR') + '원');
-    } else {
-      ['p2-avg','p2-sl','p2-t1','p2-t2','p2-t3','p2-total','p2-s1','p2-s2','p2-s3','p2-loss']
-        .forEach(id => set(id, '—'));
+    // 폼 초기화
+    ['p-name','p-code','p-buy1','p-qty1','p-buy2','p-qty2','p-custom-sl']
+      .forEach(id => { document.getElementById(id).value = ''; });
+    showToast('✅ 목록에 추가됐습니다.');
+  }
+
+  function deletePlan(id) {
+    savePlans(loadPlans().filter(p => p.id !== id));
+    renderPlans();
+  }
+
+  function w(v) { return Math.round(v).toLocaleString('ko-KR') + '원'; }
+
+  function renderPlans() {
+    const plans = loadPlans();
+    const el = document.getElementById('plan-list');
+    if (!plans.length) {
+      el.innerHTML = '<div class="plan-empty">대기 중인 종목이 없습니다.<br>위에서 종목을 추가하세요.</div>';
+      return;
     }
+
+    el.innerHTML = plans.map(p => {
+      const has2 = p.b2 && p.q2;
+
+      // 1차 기준
+      const sl1  = p.custSL ? p.custSL : Math.round(p.b1 * 0.93);
+      const t1_1 = Math.round(p.b1 * 1.03);
+      const t2_1 = Math.round(p.b1 * 1.05);
+      const t3_1 = Math.round(p.b1 * 1.07);
+      const slLabel = p.custSL ? '커스텀 손절' : '손절 (−7%)';
+
+      // 2차 기준 (평균단가)
+      let avgCol = '';
+      if (has2) {
+        const avg  = (p.b1*p.q1 + p.b2*p.q2) / (p.q1+p.q2);
+        const sl2  = p.custSL ? p.custSL : Math.round(avg * 0.93);
+        const t1_2 = Math.round(avg * 1.03);
+        const t2_2 = Math.round(avg * 1.05);
+        const t3_2 = Math.round(avg * 1.07);
+        const totalQty = p.q1 + p.q2;
+        const s1 = Math.round(totalQty * 0.4);
+        const s2 = Math.round((totalQty - s1) * 0.67);
+        const s3 = totalQty - s1 - s2;
+
+        avgCol = `
+          <div class="plan-col">
+            <div class="plan-col-title orange">2차 진입 후</div>
+            <div class="plan-row"><span class="plan-row-label">평균단가</span><span class="plan-row-val orange">${w(avg)}</span></div>
+            <div class="plan-row"><span class="plan-row-label">${slLabel}</span><span class="plan-row-val red">${w(sl2)}</span></div>
+            <div class="plan-row"><span class="plan-row-label">+3% 매도</span><span class="plan-row-val green">${w(t1_2)}</span></div>
+            <div class="plan-row"><span class="plan-row-label">+5% 매도</span><span class="plan-row-val green">${w(t2_2)}</span></div>
+            <div class="plan-row"><span class="plan-row-label">+7% 매도</span><span class="plan-row-val green">${w(t3_2)}</span></div>
+            <div class="plan-row" style="margin-top:4px;"><span class="plan-row-label">1차/2차/3차 매도</span><span class="plan-row-val">${s1}/${s2}/${s3}주</span></div>
+          </div>`;
+      } else {
+        avgCol = `<div class="plan-col" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;">2차 계획 없음</div>`;
+      }
+
+      return `
+        <div class="plan-card">
+          <div class="plan-card-header">
+            <div>
+              <div class="plan-card-title">${p.name}${p.code ? ` <span style="font-size:12px;font-weight:400;color:var(--muted);">${p.code}</span>` : ''}</div>
+              <div class="plan-card-code">${p.date} · 1차 ${w(p.b1)} × ${p.q1}주${has2 ? ` · 2차 ${w(p.b2)} × ${p.q2}주` : ''}</div>
+            </div>
+            <button class="plan-del-btn" onclick="deletePlan(${p.id})">삭제</button>
+          </div>
+          <div class="plan-grid">
+            <div class="plan-col">
+              <div class="plan-col-title blue">1차만 진입</div>
+              <div class="plan-row"><span class="plan-row-label">${slLabel}</span><span class="plan-row-val red">${w(sl1)}</span></div>
+              <div class="plan-row"><span class="plan-row-label">+3% 매도</span><span class="plan-row-val green">${w(t1_1)}</span></div>
+              <div class="plan-row"><span class="plan-row-label">+5% 매도</span><span class="plan-row-val green">${w(t2_1)}</span></div>
+              <div class="plan-row"><span class="plan-row-label">+7% 매도</span><span class="plan-row-val green">${w(t3_1)}</span></div>
+            </div>
+            ${avgCol}
+          </div>
+        </div>`;
+    }).join('');
   }
 
   /* ── 탭2: 재세팅 계산기 ── */
@@ -882,6 +957,7 @@
   window.addEventListener('DOMContentLoaded', () => {
     const urlEl = document.getElementById('sheets-url-display');
     if (urlEl) urlEl.textContent = SHEETS_URL;
+    renderPlans();
   });
 </script>
 </body>
