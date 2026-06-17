@@ -528,6 +528,7 @@
         const sl2Ref = p.custSL ? `<div class="pc-row"><span class="pc-lbl" style="color:var(--muted)">-7%</span><span class="pc-val" style="color:var(--muted);font-size:10px;">${autoAvgSL.toLocaleString('ko-KR')}</span></div>` : '';
         sec2 = `
           <hr class="pc-divider">
+          <div class="pc-row"><span class="pc-lbl">2차</span><span class="pc-val">${p.b2.toLocaleString('ko-KR')}</span></div>
           <div class="pc-row"><span class="pc-lbl" style="color:var(--orange)">평균</span><span class="pc-val orange">${w(avg)}</span></div>
           <div class="pc-row"><span class="pc-lbl">2차손절</span><span class="pc-val red">${w(sl2)}</span></div>
           ${sl2Ref}
