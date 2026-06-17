@@ -153,6 +153,11 @@
     .hist-profit { font-size: 15px; font-weight: 700; }
     .hist-rate   { font-size: 11px; color: var(--muted); margin-top: 2px; }
     .hist-del { background: none; border: none; color: var(--muted); font-size: 16px; cursor: pointer; padding: 4px; margin-left: 10px; }
+
+    /* 서브탭 */
+    .subtab-bar { display: flex; gap: 8px; }
+    .subtab-btn { flex: 1; padding: 10px; border: 1px solid var(--border); background: var(--input-bg); color: var(--muted); border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .subtab-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(233,69,96,0.1); }
   </style>
 </head>
 <body>
@@ -162,46 +167,57 @@
   <div id="tab-plan" class="tab-content active">
     <div class="page-title">매매 계획</div>
 
-    <div class="section">
-      <div class="section-title">종목 추가</div>
-      <div class="row2">
-        <div>
-          <label>종목명</label>
-          <input type="text" id="p-name" placeholder="삼성전자">
-        </div>
-        <div>
-          <label>종목코드</label>
-          <input type="text" id="p-code" placeholder="005930">
-        </div>
-      </div>
-      <div class="row2" style="margin-top:8px;">
-        <div>
-          <label>1차 매수가 (1선)</label>
-          <input type="number" id="p-buy1" placeholder="10000" oninput="autoCalcBuy2()">
-        </div>
-        <div>
-          <label>1차 수량</label>
-          <input type="number" id="p-qty1" placeholder="100">
-        </div>
-      </div>
-      <div style="margin-top:8px;">
-        <label>커스텀 손절가 <span style="color:var(--muted);font-weight:400;">(비우면 −7% 자동)</span></label>
-        <input type="number" id="p-custom-sl" placeholder="예: 9200" oninput="autoCalcBuy2()">
-      </div>
-      <div class="row2" style="margin-top:8px;">
-        <div>
-          <label>2차 매수가 <span style="color:var(--blue);font-size:10px;">자동계산</span></label>
-          <input type="number" id="p-buy2" placeholder="자동" oninput="p2manual=true">
-        </div>
-        <div>
-          <label>2차 수량</label>
-          <input type="number" id="p-qty2" placeholder="100">
-        </div>
-      </div>
-      <button class="save-btn" style="margin-top:12px;" onclick="addPlan()">+ 목록에 추가</button>
+    <!-- 서브탭 -->
+    <div class="subtab-bar">
+      <button class="subtab-btn" id="stb-add" onclick="switchSubTab('add')">+ 추가</button>
+      <button class="subtab-btn active" id="stb-wait" onclick="switchSubTab('wait')">대기 목록</button>
     </div>
 
-    <div id="plan-list"></div>
+    <!-- 추가 폼 -->
+    <div id="subtab-add" class="hidden">
+      <div class="section" style="margin-top:12px;">
+        <div class="row2">
+          <div>
+            <label>종목명</label>
+            <input type="text" id="p-name" placeholder="삼성전자">
+          </div>
+          <div>
+            <label>종목코드</label>
+            <input type="text" id="p-code" placeholder="005930">
+          </div>
+        </div>
+        <div class="row2" style="margin-top:8px;">
+          <div>
+            <label>1차 매수가 (1선)</label>
+            <input type="number" id="p-buy1" placeholder="10000" oninput="autoCalcBuy2()">
+          </div>
+          <div>
+            <label>1차 수량</label>
+            <input type="number" id="p-qty1" placeholder="100">
+          </div>
+        </div>
+        <div style="margin-top:8px;">
+          <label>커스텀 손절가 <span style="color:var(--muted);font-weight:400;">(비우면 −7% 자동)</span></label>
+          <input type="number" id="p-custom-sl" placeholder="예: 9200" oninput="autoCalcBuy2()">
+        </div>
+        <div class="row2" style="margin-top:8px;">
+          <div>
+            <label>2차 매수가 <span style="color:var(--blue);font-size:10px;">자동계산</span></label>
+            <input type="number" id="p-buy2" placeholder="자동" oninput="p2manual=true">
+          </div>
+          <div>
+            <label>2차 수량</label>
+            <input type="number" id="p-qty2" placeholder="100">
+          </div>
+        </div>
+        <button class="save-btn" style="margin-top:12px;" onclick="addPlanAndSwitch()">+ 목록에 추가</button>
+      </div>
+    </div>
+
+    <!-- 대기 목록 -->
+    <div id="subtab-wait">
+      <div id="plan-list" style="margin-top:12px;"></div>
+    </div>
   </div>
 
   <!-- ======== 탭2: 거래 입력 ======== -->
@@ -403,6 +419,19 @@
     setTimeout(() => t.classList.remove('show'), 3000);
   }
 
+  /* ── 계획 서브탭 ── */
+  function switchSubTab(name) {
+    document.getElementById('subtab-add').classList.toggle('hidden', name !== 'add');
+    document.getElementById('subtab-wait').classList.toggle('hidden', name !== 'wait');
+    document.getElementById('stb-add').classList.toggle('active', name === 'add');
+    document.getElementById('stb-wait').classList.toggle('active', name === 'wait');
+  }
+
+  function addPlanAndSwitch() {
+    addPlan();
+    if (document.getElementById('plan-list').querySelector('.pc')) switchSubTab('wait');
+  }
+
   /* ── 계획 탭: 2차 매수가 자동 계산 ── */
   function autoCalcBuy2() {
     if (p2manual) return;
@@ -456,6 +485,7 @@
     ['p-name','p-code','p-buy1','p-qty1','p-buy2','p-qty2','p-custom-sl'].forEach(id => { document.getElementById(id).value = ''; });
     p2manual = false;
     fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ type: 'plan-save', plan }) });
+    switchSubTab('wait');
     showToast('✅ 목록에 추가됐습니다.');
   }
 
