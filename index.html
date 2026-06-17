@@ -182,9 +182,16 @@
             <input type="text" id="p-name" placeholder="삼성전자">
           </div>
           <div>
+            <label>주문 날짜</label>
+            <input type="date" id="p-date">
+          </div>
+        </div>
+        <div class="row2" style="margin-top:8px;">
+          <div>
             <label>종목코드</label>
             <input type="text" id="p-code" placeholder="005930">
           </div>
+          <div></div>
         </div>
         <div class="row2" style="margin-top:8px;">
           <div>
@@ -471,6 +478,8 @@
   function addPlan() {
     const name   = document.getElementById('p-name').value.trim();
     const code   = document.getElementById('p-code').value.trim();
+    const dateRaw = document.getElementById('p-date').value;
+    const date   = dateRaw ? new Date(dateRaw).toLocaleDateString('ko-KR') : new Date().toLocaleDateString('ko-KR');
     const b1     = parseFloat(document.getElementById('p-buy1').value) || 0;
     const q1     = parseFloat(document.getElementById('p-qty1').value) || 0;
     const b2     = parseFloat(document.getElementById('p-buy2').value) || 0;
@@ -479,10 +488,11 @@
 
     if (!name || !b1 || !q1) { showToast('종목명, 1차 매수가, 수량 필수'); return; }
 
-    const plan = { id: Date.now(), date: new Date().toLocaleDateString('ko-KR'), name, code, b1, q1, b2: b2||null, q2: q2||null, custSL: custSL||null };
+    const plan = { id: Date.now(), date, name, code, b1, q1, b2: b2||null, q2: q2||null, custSL: custSL||null };
     plans.unshift(plan);
     renderPlans();
     ['p-name','p-code','p-buy1','p-qty1','p-buy2','p-qty2','p-custom-sl'].forEach(id => { document.getElementById(id).value = ''; });
+    document.getElementById('p-date').value = new Date().toISOString().split('T')[0];
     p2manual = false;
     fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ type: 'plan-save', plan }) });
     switchSubTab('wait');
@@ -754,6 +764,7 @@
   window.addEventListener('DOMContentLoaded', ()=>{
     const urlEl = document.getElementById('sheets-url-display');
     if (urlEl) urlEl.textContent = SHEETS_URL;
+    document.getElementById('p-date').value = new Date().toISOString().split('T')[0];
     initPlans();
   });
 
