@@ -61,11 +61,11 @@
     }
     .tab-btn {
       flex: 1; border: none; background: none; color: var(--muted);
-      font-size: 11px; cursor: pointer; padding: 6px 4px;
-      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      font-size: 10px; cursor: pointer; padding: 6px 2px;
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
       transition: color 0.2s;
     }
-    .tab-btn .icon { font-size: 22px; }
+    .tab-btn .icon { font-size: 20px; }
     .tab-btn.active { color: var(--accent); }
 
     /* 카드 섹션 */
@@ -473,6 +473,110 @@
     </div>
   </div>
 
+  <!-- ======== 탭 4: 매매 계획 ======== -->
+  <div id="tab-plan" class="tab-content">
+    <div class="page-title">매매 계획</div>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:14px;">전날 밤 계획 입력 → 당일 오전 빠른 참고</p>
+
+    <!-- 입력 -->
+    <div class="section">
+      <div class="section-title">진입 계획</div>
+      <div class="row2">
+        <div>
+          <label>1차 매수가 (1선)</label>
+          <input type="number" id="p-buy1" placeholder="10000" oninput="calcPlan()">
+        </div>
+        <div>
+          <label>1차 수량</label>
+          <input type="number" id="p-qty1" placeholder="100" oninput="calcPlan()">
+        </div>
+      </div>
+      <div class="row2" style="margin-top:8px;">
+        <div>
+          <label>2차 매수가 (2선)</label>
+          <input type="number" id="p-buy2" placeholder="9500" oninput="calcPlan()">
+        </div>
+        <div>
+          <label>2차 수량</label>
+          <input type="number" id="p-qty2" placeholder="100" oninput="calcPlan()">
+        </div>
+      </div>
+    </div>
+
+    <!-- 1차만 진입 시 -->
+    <div class="calc-section">
+      <div class="section-title" style="color:#7eb8f7;">1차만 진입 시</div>
+      <div class="calc-row">
+        <span class="calc-label">🔴 손절가 (−7%)</span>
+        <span class="calc-val red" id="p1-sl">—</span>
+      </div>
+      <div class="calc-row">
+        <span class="calc-label">🟢 1차 매도 (+3%)</span>
+        <span class="calc-val green" id="p1-t1">—</span>
+      </div>
+      <div class="calc-row">
+        <span class="calc-label">🟢 2차 매도 (+5%)</span>
+        <span class="calc-val green" id="p1-t2">—</span>
+      </div>
+      <div class="calc-row">
+        <span class="calc-label">🟢 3차 매도 (+7%)</span>
+        <span class="calc-val green" id="p1-t3">—</span>
+      </div>
+      <div class="calc-row" style="margin-top:6px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.1);">
+        <span class="calc-label">최대 손실액</span>
+        <span class="calc-val red" id="p1-loss">—</span>
+      </div>
+    </div>
+
+    <!-- 1차+2차 진입 시 -->
+    <div class="calc-section" style="border-color:rgba(255,165,2,0.3);">
+      <div class="section-title" style="color:var(--orange);">2차까지 진입 시 (재세팅)</div>
+      <div class="calc-row">
+        <span class="calc-label">평균단가</span>
+        <span class="calc-val orange" id="p2-avg">—</span>
+      </div>
+      <div class="calc-row">
+        <span class="calc-label">🔴 재세팅 손절가 (−7%)</span>
+        <span class="calc-val red" id="p2-sl">—</span>
+      </div>
+      <div class="calc-row">
+        <span class="calc-label">🟢 1차 매도 (+3%)</span>
+        <span class="calc-val green" id="p2-t1">—</span>
+      </div>
+      <div class="calc-row">
+        <span class="calc-label">🟢 2차 매도 (+5%)</span>
+        <span class="calc-val green" id="p2-t2">—</span>
+      </div>
+      <div class="calc-row">
+        <span class="calc-label">🟢 3차 매도 (+7%)</span>
+        <span class="calc-val green" id="p2-t3">—</span>
+      </div>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.1);">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">분할 매도 수량</div>
+        <div class="calc-row">
+          <span class="calc-label">총 수량</span>
+          <span class="calc-val" id="p2-total">—</span>
+        </div>
+        <div class="calc-row">
+          <span class="calc-label">1차 매도 (40%)</span>
+          <span class="calc-val" id="p2-s1">—</span>
+        </div>
+        <div class="calc-row">
+          <span class="calc-label">2차 매도 (잔여 67%)</span>
+          <span class="calc-val" id="p2-s2">—</span>
+        </div>
+        <div class="calc-row">
+          <span class="calc-label">3차 매도 (나머지)</span>
+          <span class="calc-val" id="p2-s3">—</span>
+        </div>
+        <div class="calc-row" style="margin-top:6px;">
+          <span class="calc-label">최대 손실액</span>
+          <span class="calc-val red" id="p2-loss">—</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ======== 탭 3: 시트 열기 ======== -->
   <div id="tab-sheets" class="tab-content">
     <div class="page-title">시트 열기</div>
@@ -507,6 +611,9 @@
 <nav class="tab-bar">
   <button class="tab-btn active" onclick="switchTab('entry', this)">
     <span class="icon">📝</span><span>입력</span>
+  </button>
+  <button class="tab-btn" onclick="switchTab('plan', this)">
+    <span class="icon">📋</span><span>계획</span>
   </button>
   <button class="tab-btn" onclick="switchTab('reset', this)">
     <span class="icon">🔄</span><span>재세팅</span>
@@ -684,6 +791,47 @@
     currentCase = 1;
     document.getElementById('section-buy2').classList.add('hidden');
     calcAll();
+  }
+
+  /* ── 탭4: 매매 계획 계산기 ── */
+  function calcPlan() {
+    const b1 = n('p-buy1'), q1 = n('p-qty1');
+    const b2 = n('p-buy2'), q2 = n('p-qty2');
+
+    // 1차만 진입 시
+    if (b1 > 0) {
+      set('p1-sl',   Math.round(b1 * 0.93).toLocaleString('ko-KR') + '원');
+      set('p1-t1',   Math.round(b1 * 1.03).toLocaleString('ko-KR') + '원');
+      set('p1-t2',   Math.round(b1 * 1.05).toLocaleString('ko-KR') + '원');
+      set('p1-t3',   Math.round(b1 * 1.07).toLocaleString('ko-KR') + '원');
+      set('p1-loss', q1 > 0 ? Math.round(b1 * q1 * 0.07).toLocaleString('ko-KR') + '원' : '—');
+    } else {
+      ['p1-sl','p1-t1','p1-t2','p1-t3','p1-loss'].forEach(id => set(id, '—'));
+    }
+
+    // 1차+2차 진입 시
+    if (b1 > 0 && q1 > 0 && b2 > 0 && q2 > 0) {
+      const avg      = (b1*q1 + b2*q2) / (q1+q2);
+      const totalQty = q1 + q2;
+      const totalAmt = b1*q1 + b2*q2;
+      const s1       = Math.round(totalQty * 0.4);
+      const s2       = Math.round((totalQty - s1) * 0.67);
+      const s3       = totalQty - s1 - s2;
+
+      set('p2-avg',   Math.round(avg).toLocaleString('ko-KR') + '원');
+      set('p2-sl',    Math.round(avg * 0.93).toLocaleString('ko-KR') + '원');
+      set('p2-t1',    Math.round(avg * 1.03).toLocaleString('ko-KR') + '원');
+      set('p2-t2',    Math.round(avg * 1.05).toLocaleString('ko-KR') + '원');
+      set('p2-t3',    Math.round(avg * 1.07).toLocaleString('ko-KR') + '원');
+      set('p2-total', totalQty + '주');
+      set('p2-s1',    s1 + '주');
+      set('p2-s2',    s2 + '주');
+      set('p2-s3',    s3 + '주');
+      set('p2-loss',  Math.round(totalAmt * 0.07).toLocaleString('ko-KR') + '원');
+    } else {
+      ['p2-avg','p2-sl','p2-t1','p2-t2','p2-t3','p2-total','p2-s1','p2-s2','p2-s3','p2-loss']
+        .forEach(id => set(id, '—'));
+    }
   }
 
   /* ── 탭2: 재세팅 계산기 ── */
