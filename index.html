@@ -641,7 +641,8 @@
     const rows = Array.from(document.querySelectorAll('#sell-rows .sell-row')).map(row => ({
       price: parseFloat(row.querySelector('.sr-price').value) || 0,
       qty: parseFloat(row.querySelector('.sr-qty').value) || 0,
-      date: row.querySelector('.sr-date').value
+      date: row.querySelector('.sr-date').value,
+      tax: parseFloat(row.querySelector('.sr-tax').value) || 0
     })).filter(r => r.price > 0 && r.qty > 0 && r.date);
 
     if (!rows.length) { showToast('매도가/수량/매도일을 입력하세요.'); return; }
@@ -675,15 +676,17 @@
     const avg = use2 ? (plan.b1*plan.q1 + plan.b2*plan.q2)/(plan.q1+plan.q2) : plan.b1;
     const totalAmt = plan.b1*plan.q1 + (use2 ? plan.b2*plan.q2 : 0);
     const soldAmt = plan.sells.reduce((s, x) => s + x.price*x.qty, 0);
-    const profit = Math.round(soldAmt - avg*totalQty);
-    const rate = parseFloat(((soldAmt/totalQty - avg) / avg).toFixed(4));
+    const totalTax = plan.sells.reduce((s, x) => s + (x.tax || 0), 0);
+    const profit = Math.round(soldAmt - avg*totalQty - totalTax);
+    const rate = parseFloat((profit / (avg*totalQty)).toFixed(4));
     const status = (profit >= 0 ? '수익' : '손절') + `(${plan.sells.length}차분할)`;
 
     const hist = loadHistory();
     hist.unshift({
       id: Date.now(), date: plan.sells[plan.sells.length - 1].date,
       name: plan.name, code: plan.code, status,
-      avg: Math.round(avg), sells: plan.sells, totalQty, profit, rate
+      avg: Math.round(avg), sells: plan.sells, totalQty, profit, rate,
+      tax: totalTax
     });
     saveHistory(hist);
 
@@ -698,7 +701,7 @@
       Math.round(avg*1.03), Math.round(avg*1.05), Math.round(avg*1.07),
       Math.round(totalAmt*0.07),
       sellDateCol, sellPriceCol, profit, rate,
-      '', status, '', '', '', '', '', '', '', ''
+      totalTax, status, '', '', '', '', '', '', '', ''
     ];
     fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ row }) });
 
