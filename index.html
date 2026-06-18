@@ -624,28 +624,60 @@
   }
 
   function saveResult() {
-    if (!modalPlanId || !modalResultStatus) { showToast('케이스를 선택하세요.'); return; }
-    const sell = parseFloat(document.getElementById('modal-sell-price').value) || 0;
-    const sellDate = document.getElementById('modal-sell-date').value;
-    if (!sell) { showToast('매도가를 입력하세요.'); return; }
-
     const plan = plans.find(p => p.id === modalPlanId);
     if (!plan) return;
 
-    const use2 = modalResultStatus.includes('2차') && plan.b2 && plan.q2;
-    const b2 = use2 ? plan.b2 : 0, q2 = use2 ? plan.q2 : 0;
-    const avg = use2 ? (plan.b1*plan.q1 + b2*q2)/(plan.q1+q2) : plan.b1;
-    const totalQty = use2 ? plan.q1+q2 : plan.q1;
-    const totalAmt = plan.b1*plan.q1 + (use2 ? b2*q2 : 0);
-    const profit = Math.round((sell - avg) * totalQty);
-    const rate = ((sell - avg) / avg).toFixed(4);
+    const rows = Array.from(document.querySelectorAll('#sell-rows .sell-row')).map(row => ({
+      price: parseFloat(row.querySelector('.sr-price').value) || 0,
+      qty: parseFloat(row.querySelector('.sr-qty').value) || 0,
+      date: row.querySelector('.sr-date').value
+    })).filter(r => r.price > 0 && r.qty > 0 && r.date);
 
-    // 히스토리 저장
+    if (!rows.length) { showToast('매도가/수량/매도일을 입력하세요.'); return; }
+
+    const hasB2 = !!(plan.b2 && plan.q2);
+    const totalQty = (hasB2 && modalUse2) ? plan.q1 + plan.q2 : plan.q1;
+    const prevSoldQty = plan.sells.reduce((s, x) => s + x.qty, 0);
+    const remainQty = totalQty - prevSoldQty;
+    const newQty = rows.reduce((s, x) => s + x.qty, 0);
+
+    if (newQty > remainQty) { showToast(`남은 수량(${remainQty}주)보다 많습니다.`); return; }
+
+    plan.sells = plan.sells.concat(rows);
+    if (plan.use2 === undefined) plan.use2 = modalUse2;
+
+    if (newQty === remainQty) {
+      finalizePlan(plan, totalQty);
+      closeModal();
+      showToast('✅ 저장 완료!');
+    } else {
+      fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ type: 'plan-update', plan }) });
+      renderPlans();
+      closeModal();
+      showToast('✅ 부분 매도 저장됨. 잔량은 계획에 남아있습니다.');
+    }
+  }
+
+  function finalizePlan(plan, totalQty) {
+    const use2 = plan.use2 && plan.b2 && plan.q2;
+    const avg = use2 ? (plan.b1*plan.q1 + plan.b2*plan.q2)/(plan.q1+plan.q2) : plan.b1;
+    const totalAmt = plan.b1*plan.q1 + (use2 ? plan.b2*plan.q2 : 0);
+    const soldAmt = plan.sells.reduce((s, x) => s + x.price*x.qty, 0);
+    const profit = Math.round(soldAmt - avg*totalQty);
+    const rate = parseFloat(((soldAmt/totalQty - avg) / avg).toFixed(4));
+    const status = (profit >= 0 ? '수익' : '손절') + `(${plan.sells.length}차분할)`;
+
     const hist = loadHistory();
-    hist.unshift({ id: Date.now(), date: sellDate, name: plan.name, code: plan.code, status: modalResultStatus, avg: Math.round(avg), sell, totalQty, profit, rate: parseFloat(rate) });
+    hist.unshift({
+      id: Date.now(), date: plan.sells[plan.sells.length - 1].date,
+      name: plan.name, code: plan.code, status,
+      avg: Math.round(avg), sells: plan.sells, totalQty, profit, rate
+    });
     saveHistory(hist);
 
-    // Sheets POST
+    const sellDateCol  = plan.sells.map(s => s.date).join(' / ');
+    const sellPriceCol = plan.sells.map(s => `${s.price}(${s.qty}주)`).join(' / ');
+    const b2 = use2 ? plan.b2 : 0, q2 = use2 ? plan.q2 : 0;
     const row = [
       plan.date, plan.name, plan.code,
       plan.b1, plan.q1, plan.b1*plan.q1, Math.round(plan.b1*1.03),
@@ -653,14 +685,12 @@
       Math.round(avg), totalAmt, Math.round(avg*0.93),
       Math.round(avg*1.03), Math.round(avg*1.05), Math.round(avg*1.07),
       Math.round(totalAmt*0.07),
-      sellDate, sell, profit, rate,
-      '', modalResultStatus, '', '', '', '', '', '', '', ''
+      sellDateCol, sellPriceCol, profit, rate,
+      '', status, '', '', '', '', '', '', '', ''
     ];
     fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ row }) });
 
-    deletePlan(modalPlanId);
-    closeModal();
-    showToast('✅ 저장 완료!');
+    deletePlan(plan.id);
   }
 
   /* ── 탭2: 계산 ── */
