@@ -156,6 +156,7 @@
     .hist-right { text-align: right; }
     .hist-profit { font-size: 15px; font-weight: 700; }
     .hist-rate   { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .hist-tax    { font-size: 11px; color: var(--red); margin-top: 2px; }
     .hist-del { background: none; border: none; color: var(--muted); font-size: 16px; cursor: pointer; padding: 4px; margin-left: 10px; }
 
     /* 서브탭 */
@@ -837,6 +838,7 @@
         <div class="hist-right">
           <div class="hist-profit ${h.profit>=0?'green':'red'}">${h.profit>=0?'+':''}${h.profit.toLocaleString('ko-KR')}원</div>
           <div class="hist-rate">${(h.rate*100)>=0?'+':''}${(h.rate*100).toFixed(2)}%</div>
+          ${h.tax > 0 ? `<div class="hist-tax">세금 -${h.tax.toLocaleString('ko-KR')}원</div>` : ''}
         </div>
         <button class="hist-del" onclick="deleteHistory(${h.id})">✕</button>
       </div>`).join('');
