@@ -655,7 +655,7 @@
     if (plan.use2 === undefined) plan.use2 = modalUse2;
 
     if (newQty === remainQty) {
-      finalizePlan(plan, totalQty);
+      finalizePlan(plan);
       closeModal();
       showToast('✅ 저장 완료!');
     } else {
@@ -666,8 +666,9 @@
     }
   }
 
-  function finalizePlan(plan, totalQty) {
+  function finalizePlan(plan) {
     const use2 = plan.use2 && plan.b2 && plan.q2;
+    const totalQty = use2 ? plan.q1 + plan.q2 : plan.q1;
     const avg = use2 ? (plan.b1*plan.q1 + plan.b2*plan.q2)/(plan.q1+plan.q2) : plan.b1;
     const totalAmt = plan.b1*plan.q1 + (use2 ? plan.b2*plan.q2 : 0);
     const soldAmt = plan.sells.reduce((s, x) => s + x.price*x.qty, 0);
