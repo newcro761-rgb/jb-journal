@@ -118,6 +118,7 @@
     .pc-val.green { color: var(--green); }
     .pc-val.orange { color: var(--orange); }
     .pc-divider { border: none; border-top: 1px solid var(--border); margin: 5px 0; }
+    .pc-progress { margin-top: 7px; padding-top: 7px; border-top: 1px solid var(--border); font-size: 10px; color: var(--blue); }
     .pc-result-btn {
       width: 100%; margin-top: 7px; padding: 5px; background: rgba(233,69,96,0.15);
       border: 1px solid rgba(233,69,96,0.4); color: var(--accent); border-radius: 6px;
@@ -539,6 +540,12 @@
           <div class="pc-row"><span class="pc-lbl">+7%</span><span class="pc-val green">${Math.round(avg*1.07).toLocaleString('ko-KR')}</span></div>`;
       }
 
+      const sells = p.sells || [];
+      const soldQty = sells.reduce((s, x) => s + x.qty, 0);
+      const progress = sells.length
+        ? `<div class="pc-progress">매도진행: ${soldQty}주 · 평균 ${Math.round(sells.reduce((s,x)=>s+x.price*x.qty,0)/soldQty).toLocaleString('ko-KR')}원</div>`
+        : '';
+
       return `
         <div class="pc">
           <button class="pc-del" onclick="deletePlan(${p.id})">✕</button>
@@ -551,6 +558,7 @@
           <div class="pc-row"><span class="pc-lbl">+5%</span><span class="pc-val green">${t2.toLocaleString('ko-KR')}</span></div>
           <div class="pc-row"><span class="pc-lbl">+7%</span><span class="pc-val green">${t3.toLocaleString('ko-KR')}</span></div>
           ${sec2}
+          ${progress}
           <button class="pc-result-btn" onclick="openModal(${p.id})">결과 입력</button>
         </div>`;
     }).join('') + '</div>';
