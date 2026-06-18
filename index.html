@@ -613,9 +613,12 @@
         <div><label>매도가</label><input type="number" class="sr-price" placeholder="10300"></div>
         <div><label>수량</label><input type="number" class="sr-qty" placeholder="50"></div>
       </div>
-      <div class="row2" style="margin-top:8px;align-items:end;">
+      <div class="row2" style="margin-top:8px;">
         <div><label>매도일</label><input type="date" class="sr-date" value="${new Date().toISOString().split('T')[0]}"></div>
-        <div style="display:flex;justify-content:flex-end;"><button type="button" class="sr-del" onclick="removeSellRow(this)">✕ 삭제</button></div>
+        <div><label>세금 (원, 선택)</label><input type="number" class="sr-tax" placeholder="0"></div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:8px;">
+        <button type="button" class="sr-del" onclick="removeSellRow(this)">✕ 삭제</button>
       </div>`;
     wrap.appendChild(div);
   }
