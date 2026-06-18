@@ -131,10 +131,13 @@
     .modal-box { background: var(--card); border-radius: 16px 16px 0 0; padding: 20px 16px 32px; width: 100%; max-width: 480px; border-top: 1px solid var(--border); }
     .modal-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
     .modal-sub { font-size: 12px; color: var(--muted); margin-bottom: 16px; }
-    .result-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
-    .result-btn { padding: 10px; border: 2px solid var(--border); background: var(--input-bg); color: var(--muted); border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; text-align: center; }
-    .result-btn.active-green { border-color: var(--green); color: var(--green); background: rgba(46,213,115,0.1); }
-    .result-btn.active-red   { border-color: var(--red);   color: var(--red);   background: rgba(255,71,87,0.1); }
+    .sell-row { background: var(--input-bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px; margin-bottom: 8px; }
+    .sr-del { padding: 8px 10px; background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 8px; font-size: 12px; cursor: pointer; }
+    .add-row-btn { width: 100%; padding: 10px; margin-bottom: 14px; background: none; border: 1px dashed var(--border); color: var(--blue); border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .toggle-btn { width: 44px; height: 26px; border-radius: 13px; border: none; background: var(--border); position: relative; cursor: pointer; transition: background 0.15s; }
+    .toggle-btn::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: white; transition: left 0.15s; }
+    .toggle-btn.on { background: var(--green); }
+    .toggle-btn.on::after { left: 21px; }
     .modal-actions { display: flex; gap: 8px; margin-top: 14px; }
     .modal-cancel { flex: 1; padding: 14px; background: var(--input-bg); border: 1px solid var(--border); color: var(--muted); border-radius: 10px; font-size: 15px; cursor: pointer; }
     .modal-save { flex: 2; padding: 14px; background: var(--accent); border: none; color: white; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; }
@@ -360,16 +363,13 @@
   <div class="modal-box">
     <div class="modal-title" id="modal-stock-name">종목명</div>
     <div class="modal-sub" id="modal-stock-info">1차 매수가</div>
-    <div class="result-btns">
-      <button class="result-btn" onclick="selectResult('수익(1차만)')">✅ 1차 익절</button>
-      <button class="result-btn" onclick="selectResult('수익(2차까지)')">✅ 2차 익절</button>
-      <button class="result-btn" onclick="selectResult('손절(1차만)')">❌ 1차 손절</button>
-      <button class="result-btn" onclick="selectResult('손절(2차까지)')">❌ 2차 손절</button>
+    <div class="modal-sub" id="modal-holdings-info"></div>
+    <div class="hidden" id="modal-use2-row" style="margin:10px 0;display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-size:13px;color:var(--text);">2차 매수 실제 체결</span>
+      <button type="button" class="toggle-btn" id="modal-use2-toggle" onclick="toggleUse2()"></button>
     </div>
-    <label>실제 매도가</label>
-    <input type="number" id="modal-sell-price" placeholder="매도가 입력">
-    <label style="margin-top:10px;">매도일</label>
-    <input type="date" id="modal-sell-date">
+    <div id="sell-rows"></div>
+    <button type="button" class="add-row-btn" id="add-sell-row-btn" onclick="addSellRow()">+ 매도 추가</button>
     <div class="modal-actions">
       <button class="modal-cancel" onclick="closeModal()">취소</button>
       <button class="modal-save" onclick="saveResult()">저장하기</button>
@@ -404,7 +404,7 @@
   let currentCase = 1;
   let p2manual = false;      // 2차 매수가 수동 입력 여부
   let modalPlanId = null;    // 현재 모달에 열린 plan id
-  let modalResultStatus = null;
+  let modalUse2 = true;      // 모달에서 2차 매수 실제 체결 여부 토글 상태
 
   /* ── 탭 전환 ── */
   function switchTab(name, btn) {
@@ -561,26 +561,66 @@
     const plan = plans.find(p => p.id === id);
     if (!plan) return;
     modalPlanId = id;
-    modalResultStatus = null;
+    if (!plan.sells) plan.sells = [];
+
+    const hasB2 = !!(plan.b2 && plan.q2);
+    modalUse2 = plan.use2 !== undefined ? plan.use2 : true;
+
     document.getElementById('modal-stock-name').textContent = plan.name + (plan.code ? ` (${plan.code})` : '');
     document.getElementById('modal-stock-info').textContent = `1차 ${w(plan.b1)} × ${plan.q1}주` + (plan.b2 ? ` · 2차 ${w(plan.b2)} × ${plan.q2}주` : '');
-    document.getElementById('modal-sell-price').value = '';
-    document.getElementById('modal-sell-date').value = new Date().toISOString().split('T')[0];
-    document.querySelectorAll('.result-btn').forEach(b => b.className = 'result-btn');
+
+    const use2Row = document.getElementById('modal-use2-row');
+    use2Row.classList.toggle('hidden', !hasB2 || plan.sells.length > 0);
+    document.getElementById('modal-use2-toggle').classList.toggle('on', modalUse2);
+
+    updateHoldingsInfo(plan);
+
+    document.getElementById('sell-rows').innerHTML = '';
+    addSellRow();
+
     document.getElementById('result-modal').classList.add('show');
+  }
+
+  function updateHoldingsInfo(plan) {
+    const hasB2 = !!(plan.b2 && plan.q2);
+    const totalQty = (hasB2 && modalUse2) ? plan.q1 + plan.q2 : plan.q1;
+    const soldQty = plan.sells.reduce((s, x) => s + x.qty, 0);
+    document.getElementById('modal-holdings-info').textContent = `총 ${totalQty}주 · 매도완료 ${soldQty}주 · 남음 ${totalQty - soldQty}주`;
+  }
+
+  function toggleUse2() {
+    modalUse2 = !modalUse2;
+    document.getElementById('modal-use2-toggle').classList.toggle('on', modalUse2);
+    const plan = plans.find(p => p.id === modalPlanId);
+    if (plan) updateHoldingsInfo(plan);
+  }
+
+  function addSellRow() {
+    const wrap = document.getElementById('sell-rows');
+    if (wrap.querySelectorAll('.sell-row').length >= 3) return;
+    const div = document.createElement('div');
+    div.className = 'sell-row';
+    div.innerHTML = `
+      <div class="row2">
+        <div><label>매도가</label><input type="number" class="sr-price" placeholder="10300"></div>
+        <div><label>수량</label><input type="number" class="sr-qty" placeholder="50"></div>
+      </div>
+      <div class="row2" style="margin-top:8px;align-items:end;">
+        <div><label>매도일</label><input type="date" class="sr-date" value="${new Date().toISOString().split('T')[0]}"></div>
+        <div style="display:flex;justify-content:flex-end;"><button type="button" class="sr-del" onclick="removeSellRow(this)">✕ 삭제</button></div>
+      </div>`;
+    wrap.appendChild(div);
+  }
+
+  function removeSellRow(btn) {
+    const wrap = document.getElementById('sell-rows');
+    if (wrap.querySelectorAll('.sell-row').length <= 1) return;
+    btn.closest('.sell-row').remove();
   }
 
   function closeModal() {
     document.getElementById('result-modal').classList.remove('show');
     modalPlanId = null;
-  }
-
-  function selectResult(status) {
-    modalResultStatus = status;
-    document.querySelectorAll('.result-btn').forEach(b => b.className = 'result-btn');
-    const map = { '수익(1차만)': 0, '수익(2차까지)': 1, '손절(1차만)': 2, '손절(2차까지)': 3 };
-    const btn = document.querySelectorAll('.result-btn')[map[status]];
-    btn.className = 'result-btn ' + (status.startsWith('수익') ? 'active-green' : 'active-red');
   }
 
   function saveResult() {
