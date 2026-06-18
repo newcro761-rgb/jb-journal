@@ -825,7 +825,7 @@
       <div class="hist-item">
         <div class="hist-left">
           <div class="hist-name">${h.name}${h.code?` <span style="font-size:11px;color:var(--muted);">${h.code}</span>`:''}</div>
-          <div class="hist-meta">${h.date} · ${h.status}</div>
+          <div class="hist-meta">${h.date} · ${h.status}${h.sells && h.sells.length > 1 ? ` · ${h.sells.length}건 분할매도` : ''}</div>
         </div>
         <div class="hist-right">
           <div class="hist-profit ${h.profit>=0?'green':'red'}">${h.profit>=0?'+':''}${h.profit.toLocaleString('ko-KR')}원</div>
