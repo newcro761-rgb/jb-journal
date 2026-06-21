@@ -632,6 +632,9 @@
         <div><label>매도일</label><input type="date" class="sr-date" value="${new Date().toISOString().split('T')[0]}"></div>
         <div><label>세금 (원, 선택)</label><input type="number" class="sr-tax" placeholder="0"></div>
       </div>
+      <div style="margin-top:8px;">
+        <label>메모 (선택)</label><input type="text" class="sr-memo" placeholder="예: 반등 약해서 일부 정리">
+      </div>
       <div style="display:flex;justify-content:flex-end;margin-top:8px;">
         <button type="button" class="sr-del" onclick="removeSellRow(this)">✕ 삭제</button>
       </div>`;
