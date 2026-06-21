@@ -694,14 +694,19 @@
   }
 
   function finalizePlan(plan) {
-    const use2 = plan.use2 && plan.b2 && plan.q2;
+    const use2 = plan.use2 === true && !!(plan.b2 && plan.q2);
     const totalQty = use2 ? plan.q1 + plan.q2 : plan.q1;
     const avg = use2 ? (plan.b1*plan.q1 + plan.b2*plan.q2)/(plan.q1+plan.q2) : plan.b1;
     const totalAmt = plan.b1*plan.q1 + (use2 ? plan.b2*plan.q2 : 0);
-    const soldAmt = plan.sells.reduce((s, x) => s + x.price*x.qty, 0);
+
+    const info2 = use2 ? phaseInfo(plan, true) : null;
+    const phase1Sells = plan.sells.filter(s => (s.phase || 1) === 1);
+    const phase2Sells = plan.sells.filter(s => s.phase === 2);
+    const profit1 = phase1Sells.reduce((s, x) => s + (x.price - plan.b1) * x.qty, 0);
+    const profit2 = info2 ? phase2Sells.reduce((s, x) => s + (x.price - info2.base) * x.qty, 0) : 0;
     const totalTax = plan.sells.reduce((s, x) => s + (x.tax || 0), 0);
-    const profit = Math.round(soldAmt - avg*totalQty - totalTax);
-    const rate = parseFloat((profit / (avg*totalQty)).toFixed(4));
+    const profit = Math.round(profit1 + profit2 - totalTax);
+    const rate = parseFloat((profit / totalAmt).toFixed(4));
     const status = (profit >= 0 ? '수익' : '손절') + `(${plan.sells.length}차분할)`;
 
     const hist = loadHistory();
@@ -709,12 +714,13 @@
       id: Date.now(), date: plan.sells[plan.sells.length - 1].date,
       name: plan.name, code: plan.code, status,
       avg: Math.round(avg), sells: plan.sells, totalQty, profit, rate,
-      tax: totalTax
+      tax: totalTax, use2: plan.use2 === true
     });
     saveHistory(hist);
 
     const sellDateCol  = plan.sells.map(s => s.date).join(' / ');
     const sellPriceCol = plan.sells.map(s => `${s.price}(${s.qty}주)`).join(' / ');
+    const memoCol = plan.sells.filter(s => s.memo).map(s => `${s.date}: ${s.memo}`).join(' / ');
     const b2 = use2 ? plan.b2 : 0, q2 = use2 ? plan.q2 : 0;
     const row = [
       plan.date, plan.name, plan.code,
@@ -724,7 +730,7 @@
       Math.round(avg*1.03), Math.round(avg*1.05), Math.round(avg*1.07),
       Math.round(totalAmt*0.07),
       sellDateCol, sellPriceCol, profit, rate,
-      totalTax, status, '', '', '', '', '', '', '', ''
+      totalTax, status, memoCol, '', '', '', '', '', '', ''
     ];
     fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ row }) });
 
