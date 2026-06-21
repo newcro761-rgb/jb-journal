@@ -590,11 +590,25 @@
     document.getElementById('result-modal').classList.add('show');
   }
 
-  function updateHoldingsInfo(plan) {
+  function phaseInfo(plan, useSecondPhase) {
     const hasB2 = !!(plan.b2 && plan.q2);
-    const totalQty = (hasB2 && modalUse2) ? plan.q1 + plan.q2 : plan.q1;
-    const soldQty = plan.sells.reduce((s, x) => s + x.qty, 0);
-    document.getElementById('modal-holdings-info').textContent = `총 ${totalQty}주 · 매도완료 ${soldQty}주 · 남음 ${totalQty - soldQty}주`;
+    const sells = plan.sells || [];
+    const phase1Sold = sells.filter(s => (s.phase || 1) === 1).reduce((s, x) => s + x.qty, 0);
+
+    if (!hasB2 || !useSecondPhase) {
+      return { phase: 1, base: plan.b1, pool: plan.q1, sold: phase1Sold };
+    }
+    const remainingQ1 = plan.q1 - phase1Sold;
+    const pool2 = remainingQ1 + plan.q2;
+    const base2 = (plan.b1 * remainingQ1 + plan.b2 * plan.q2) / pool2;
+    const phase2Sold = sells.filter(s => s.phase === 2).reduce((s, x) => s + x.qty, 0);
+    return { phase: 2, base: base2, pool: pool2, sold: phase2Sold };
+  }
+
+  function updateHoldingsInfo(plan) {
+    const info = phaseInfo(plan, modalUse2);
+    document.getElementById('modal-holdings-info').textContent =
+      `총 ${info.pool}주 · 매도완료 ${info.sold}주 · 남음 ${info.pool - info.sold}주`;
   }
 
   function toggleUse2() {
