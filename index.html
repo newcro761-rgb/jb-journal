@@ -598,6 +598,10 @@
     if (!hasB2 || !useSecondPhase) {
       return { phase: 1, base: plan.b1, pool: plan.q1, sold: phase1Sold };
     }
+    // base2's blended-average formula assumes phase1Sold (and thus remainingQ1) is
+    // frozen once plan.use2 locks true — i.e. no phase-1-only sells are recorded after
+    // the lock. That one-way lock is enforced in saveResult(); if it were ever loosened,
+    // remainingQ1 could keep shrinking after lock and base2 would silently be wrong.
     const remainingQ1 = plan.q1 - phase1Sold;
     const pool2 = remainingQ1 + plan.q2;
     const base2 = (plan.b1 * remainingQ1 + plan.b2 * plan.q2) / pool2;
@@ -713,6 +717,9 @@
     hist.unshift({
       id: Date.now(), date: plan.sells[plan.sells.length - 1].date,
       name: plan.name, code: plan.code, status,
+      // avg is the full nominal blended cost basis across q1+q2 (display-only);
+      // it is NOT the per-phase basis actually used to compute profit/rate above,
+      // which is split via plan.b1 (phase 1) and phaseInfo(plan,true).base (phase 2).
       avg: Math.round(avg), sells: plan.sells, totalQty, profit, rate,
       tax: totalTax, use2: plan.use2 === true
     });
@@ -861,7 +868,7 @@
       const sellLines = (h.sells || []).map(s => {
         const tag = h.use2 ? (s.phase === 2 ? ' <span style="color:var(--orange);">[평단]</span>' : ' <span style="color:var(--blue);">[1차]</span>') : '';
         const memo = s.memo ? ` — ${s.memo}` : '';
-        return `<div class="hist-meta">${s.date} · ${s.price.toLocaleString('ko-KR')}원 × ${s.qty}주${tag}${memo}</div>`;
+        return `<div class="hist-meta">${s.date} · ${(s.price || 0).toLocaleString('ko-KR')}원 × ${s.qty}주${tag}${memo}</div>`;
       }).join('');
 
       return `
