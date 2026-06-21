@@ -573,13 +573,13 @@
     if (!plan.sells) plan.sells = [];
 
     const hasB2 = !!(plan.b2 && plan.q2);
-    modalUse2 = plan.use2 !== undefined ? plan.use2 : true;
+    modalUse2 = plan.use2 === true ? true : false;
 
     document.getElementById('modal-stock-name').textContent = plan.name + (plan.code ? ` (${plan.code})` : '');
     document.getElementById('modal-stock-info').textContent = `1차 ${w(plan.b1)} × ${plan.q1}주` + (plan.b2 ? ` · 2차 ${w(plan.b2)} × ${plan.q2}주` : '');
 
     const use2Row = document.getElementById('modal-use2-row');
-    use2Row.classList.toggle('hidden', !hasB2 || plan.sells.length > 0);
+    use2Row.classList.toggle('hidden', !hasB2 || plan.use2 === true);
     document.getElementById('modal-use2-toggle').classList.toggle('on', modalUse2);
 
     updateHoldingsInfo(plan);
