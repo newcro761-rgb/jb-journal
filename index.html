@@ -857,11 +857,19 @@
       <div class="stat-card"><div class="stat-label">거래 수</div><div class="stat-val">${hist.length}건</div></div>
       <div class="stat-card"><div class="stat-label">평균 수익률</div><div class="stat-val ${avgR>=0?'green':'red'}">${avgR>=0?'+':''}${avgR}%</div></div>`;
 
-    list.innerHTML = hist.map(h => `
+    list.innerHTML = hist.map(h => {
+      const sellLines = (h.sells || []).map(s => {
+        const tag = h.use2 ? (s.phase === 2 ? ' <span style="color:var(--orange);">[평단]</span>' : ' <span style="color:var(--blue);">[1차]</span>') : '';
+        const memo = s.memo ? ` — ${s.memo}` : '';
+        return `<div class="hist-meta">${s.date} · ${s.price.toLocaleString('ko-KR')}원 × ${s.qty}주${tag}${memo}</div>`;
+      }).join('');
+
+      return `
       <div class="hist-item">
         <div class="hist-left">
           <div class="hist-name">${h.name}${h.code?` <span style="font-size:11px;color:var(--muted);">${h.code}</span>`:''}</div>
           <div class="hist-meta">${h.date} · ${h.status}${h.sells && h.sells.length > 1 ? ` · ${h.sells.length}건 분할매도` : ''}</div>
+          ${sellLines}
         </div>
         <div class="hist-right">
           <div class="hist-profit ${h.profit>=0?'green':'red'}">${h.profit>=0?'+':''}${h.profit.toLocaleString('ko-KR')}원</div>
@@ -869,7 +877,8 @@
           ${h.tax > 0 ? `<div class="hist-tax">세금 -${h.tax.toLocaleString('ko-KR')}원</div>` : ''}
         </div>
         <button class="hist-del" onclick="deleteHistory(${h.id})">✕</button>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   }
 
   /* ── 탭4: 시트 ── */
