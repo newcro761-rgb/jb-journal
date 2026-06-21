@@ -656,27 +656,32 @@
     const plan = plans.find(p => p.id === modalPlanId);
     if (!plan) return;
 
+    const info = phaseInfo(plan, modalUse2);
+
     const rows = Array.from(document.querySelectorAll('#sell-rows .sell-row')).map(row => ({
       price: parseFloat(row.querySelector('.sr-price').value) || 0,
       qty: parseFloat(row.querySelector('.sr-qty').value) || 0,
       date: row.querySelector('.sr-date').value,
-      tax: parseFloat(row.querySelector('.sr-tax').value) || 0
+      tax: parseFloat(row.querySelector('.sr-tax').value) || 0,
+      phase: info.phase,
+      memo: row.querySelector('.sr-memo').value.trim()
     })).filter(r => r.price > 0 && r.qty > 0 && r.date);
 
     if (!rows.length) { showToast('매도가/수량/매도일을 입력하세요.'); return; }
 
-    const hasB2 = !!(plan.b2 && plan.q2);
-    const totalQty = (hasB2 && modalUse2) ? plan.q1 + plan.q2 : plan.q1;
-    const prevSoldQty = plan.sells.reduce((s, x) => s + x.qty, 0);
-    const remainQty = totalQty - prevSoldQty;
+    const remainQty = info.pool - info.sold;
     const newQty = rows.reduce((s, x) => s + x.qty, 0);
 
     if (newQty > remainQty) { showToast(`남은 수량(${remainQty}주)보다 많습니다.`); return; }
 
     plan.sells = plan.sells.concat(rows);
-    if (plan.use2 === undefined) plan.use2 = modalUse2;
+    if (modalUse2 === true) plan.use2 = true;
 
-    if (newQty === remainQty) {
+    const hasB2 = !!(plan.b2 && plan.q2);
+    const totalQty = (hasB2 && plan.use2 === true) ? plan.q1 + plan.q2 : plan.q1;
+    const allSoldQty = plan.sells.reduce((s, x) => s + x.qty, 0);
+
+    if (allSoldQty === totalQty) {
       finalizePlan(plan);
       closeModal();
       showToast('✅ 저장 완료!');
