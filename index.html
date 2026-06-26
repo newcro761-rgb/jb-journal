@@ -911,6 +911,9 @@
     const totalQty = use2 ? q1+q2 : q1;
     const totalAmt = b1*q1+(use2?b2*q2:0);
     const sellAmt = sell > 0 ? sell*totalQty : 0;
+    const statusVal = sell > 0
+      ? document.getElementById('tradeStatus').value + ' · ' + tierTag((sell - avg) / avg)
+      : document.getElementById('tradeStatus').value;
     const row = [
       document.getElementById('buyDate').value,
       document.getElementById('stockName').value,
@@ -924,7 +927,7 @@
       sell||'',
       sell>0?Math.round((sell-avg)*totalQty):'',
       sell>0?((sell-avg)/avg).toFixed(4):'',
-      '', document.getElementById('tradeStatus').value,
+      '', statusVal,
       '케이스'+currentCase, getReasons(),
       REGIME_LABEL[entryRegime] || '', '', '', '', document.getElementById('memo').value
     ];
