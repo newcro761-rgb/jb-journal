@@ -823,6 +823,50 @@
     editHistId = null;
   }
 
+  function saveEditedHistory() {
+    const hist = loadHistory();
+    const h = hist.find(x => x.id === editHistId);
+    if (!h) return;
+
+    const sells = Array.from(document.querySelectorAll('#edit-sell-rows .sell-row')).map(row => {
+      const price = parseFloat(row.querySelector('.sr-price').value) || 0;
+      return {
+        price,
+        qty: parseFloat(row.querySelector('.sr-qty').value) || 0,
+        date: row.querySelector('.sr-date').value,
+        tax: parseFloat(row.querySelector('.sr-tax').value) || 0,
+        phase: parseInt(row.dataset.phase, 10) || 1,
+        memo: row.querySelector('.sr-memo').value.trim(),
+        tag: tierTag((price - h.avg) / h.avg)
+      };
+    }).filter(r => r.price > 0 && r.qty > 0 && r.date);
+
+    if (!sells.length) { showToast('매도가/수량/매도일을 입력하세요.'); return; }
+
+    const totalTax = sells.reduce((s, x) => s + (x.tax || 0), 0);
+    const totalQty = sells.reduce((s, x) => s + x.qty, 0);
+    const profit = Math.round(sells.reduce((s, x) => s + (x.price - h.avg) * x.qty, 0) - totalTax);
+    const rate = parseFloat((profit / (h.avg * totalQty)).toFixed(4));
+    const bestTag = sells.reduce((best, s) =>
+      TIER_RANK.indexOf(s.tag) > TIER_RANK.indexOf(best) ? s.tag : best,
+      sells[0].tag);
+    const status = (profit >= 0 ? '수익' : '손절') + `(${sells.length}차분할) · 최고 ${bestTag}`;
+
+    h.name = document.getElementById('edit-name').value;
+    h.code = document.getElementById('edit-code').value;
+    h.sells = sells;
+    h.totalQty = totalQty;
+    h.profit = profit;
+    h.rate = rate;
+    h.tax = totalTax;
+    h.status = status;
+
+    saveHistory(hist);
+    closeEditModal();
+    renderHistory();
+    showToast('✅ 수정 완료!');
+  }
+
   function saveResult() {
     const plan = plans.find(p => p.id === modalPlanId);
     if (!plan) return;
