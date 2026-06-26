@@ -163,6 +163,25 @@
     .subtab-bar { display: flex; gap: 8px; }
     .subtab-btn { flex: 1; padding: 10px; border: 1px solid var(--border); background: var(--input-bg); color: var(--muted); border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
     .subtab-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(233,69,96,0.1); }
+
+    /* 장세 버튼 + 대기목록 주문일/장세 배지 */
+    .regime-btns { display: flex; gap: 8px; }
+    .regime-btn {
+      flex: 1; padding: 10px 4px; border: 2px solid var(--border); background: var(--input-bg);
+      color: var(--muted); border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; text-align: center;
+    }
+    .regime-btn.active.r-up   { border-color: var(--green);  color: var(--green);  background: rgba(46,213,115,0.1); }
+    .regime-btn.active.r-box  { border-color: var(--orange); color: var(--orange); background: rgba(255,165,2,0.1); }
+    .regime-btn.active.r-down { border-color: var(--red);    color: var(--red);    background: rgba(255,71,87,0.1); }
+    .pc-regime {
+      display: inline-block; font-size: 9px; font-weight: 700; padding: 1px 6px;
+      border-radius: 8px; margin-bottom: 4px;
+    }
+    .pc-regime.r-up   { background: rgba(46,213,115,0.15); color: var(--green); }
+    .pc-regime.r-box  { background: rgba(255,165,2,0.15);  color: var(--orange); }
+    .pc-regime.r-down { background: rgba(255,71,87,0.15);  color: var(--red); }
+    .pc-order-date { font-size: 10px; color: var(--muted); margin-bottom: 6px; }
+    .pc-order-date.warn { color: var(--red); font-weight: 700; }
   </style>
 </head>
 <body>
