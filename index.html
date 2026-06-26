@@ -341,6 +341,7 @@
         <div><label>실제 매도가 (원)</label><input type="number" id="sellPrice" placeholder="10300" oninput="calcAll()"></div>
         <div><label>매도일</label><input type="date" id="sellDate" oninput="calcAll()"></div>
       </div>
+      <div><label>세금 (원, 선택)</label><input type="number" id="sellTax" placeholder="0"></div>
       <hr class="divider">
       <div class="calc-row"><span class="calc-label">수익금 (세전)</span><span class="calc-val" id="calc-profit">—</span></div>
       <div class="calc-row"><span class="calc-label">수익률</span><span class="calc-val" id="calc-rate">—</span></div>
@@ -1058,6 +1059,7 @@
     const b1 = n('buy1Price'), q1 = n('buy1Qty');
     const b2 = n('buy2Price'), q2 = n('buy2Qty');
     const sell = n('sellPrice');
+    const tax = n('sellTax');
     const use2 = currentCase !== 1 && b2 > 0 && q2 > 0;
     if (!b1 || !q1) { showToast('1차 매수가와 수량을 입력하세요.'); return; }
     if (!entryRegime) { showToast('장세(상승장/박스장/하락장)를 선택하세요'); return; }
@@ -1065,6 +1067,8 @@
     const totalQty = use2 ? q1+q2 : q1;
     const totalAmt = b1*q1+(use2?b2*q2:0);
     const sellAmt = sell > 0 ? sell*totalQty : 0;
+    const profit = sell > 0 ? Math.round((sell-avg)*totalQty - tax) : null;
+    const rate = sell > 0 ? parseFloat((profit/(avg*totalQty)).toFixed(4)) : null;
     const statusVal = sell > 0
       ? document.getElementById('tradeStatus').value + ' · ' + tierTag((sell - avg) / avg)
       : document.getElementById('tradeStatus').value;
@@ -1079,9 +1083,9 @@
       Math.round(totalAmt*0.07),
       document.getElementById('sellDate').value,
       sell||'',
-      sell>0?Math.round((sell-avg)*totalQty):'',
-      sell>0?((sell-avg)/avg).toFixed(4):'',
-      '', statusVal,
+      profit ?? '',
+      rate ?? '',
+      tax||'', statusVal,
       '케이스'+currentCase, getReasons(),
       REGIME_LABEL[entryRegime] || '', '', '', '', document.getElementById('memo').value
     ];
@@ -1097,13 +1101,12 @@
         sells: [{
           price: sell, qty: totalQty,
           date: document.getElementById('sellDate').value,
-          tax: 0, phase: 1,
+          tax, phase: 1,
           memo: document.getElementById('memo').value,
           tag: tierTag((sell - avg) / avg)
         }],
-        totalQty, profit: Math.round((sell - avg) * totalQty),
-        rate: parseFloat(((sell - avg) / avg).toFixed(4)),
-        tax: 0, use2, regime: entryRegime || null, verdict: null
+        totalQty, profit, rate,
+        tax, use2, regime: entryRegime || null, verdict: null
       });
       saveHistory(hist);
     }
@@ -1116,7 +1119,7 @@
   }
 
   function resetForm() {
-    ['stockName','stockCode','buyDate','buy1Price','buy1Qty','buy2Price','buy2Qty','sellPrice','sellDate','memo'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    ['stockName','stockCode','buyDate','buy1Price','buy1Qty','buy2Price','buy2Qty','sellPrice','sellDate','sellTax','memo'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
     document.getElementById('tradeStatus').value='보유중';
     document.querySelectorAll('#reason-pills .pill.active').forEach(p=>p.classList.remove('active'));
     document.querySelectorAll('.case-btn').forEach((b,i)=>b.classList.toggle('active',i===0));
