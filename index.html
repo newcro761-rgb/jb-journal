@@ -200,7 +200,13 @@
     <!-- 추가 폼 -->
     <div id="subtab-add" class="hidden">
       <div class="section" style="margin-top:12px;">
-        <div class="row2">
+        <label>장세</label>
+        <div class="regime-btns">
+          <button type="button" class="regime-btn" onclick="setPlanRegime('up',this)">상승장</button>
+          <button type="button" class="regime-btn" onclick="setPlanRegime('box',this)">박스장</button>
+          <button type="button" class="regime-btn" onclick="setPlanRegime('down',this)">하락장</button>
+        </div>
+        <div class="row2" style="margin-top:10px;">
           <div>
             <label>종목명</label>
             <input type="text" id="p-name" placeholder="삼성전자">
@@ -427,6 +433,7 @@
   let modalPlanId = null;    // 현재 모달에 열린 plan id
   let modalUse2 = true;      // 모달에서 2차 매수 실제 체결 여부 토글 상태
   const REGIME_LABEL = { up: '상승장', box: '박스장', down: '하락장' };
+  let planRegime = null;     // 계획 추가 폼에서 선택한 장세
 
   /* ── 탭 전환 ── */
   function switchTab(name, btn) {
@@ -503,7 +510,7 @@
     const name   = document.getElementById('p-name').value.trim();
     const code   = document.getElementById('p-code').value.trim();
     const dateRaw = document.getElementById('p-date').value;
-    const date   = dateRaw ? new Date(dateRaw).toLocaleDateString('ko-KR') : new Date().toLocaleDateString('ko-KR');
+    const date   = dateRaw || new Date().toISOString().split('T')[0];
     const b1     = parseFloat(document.getElementById('p-buy1').value) || 0;
     const q1     = parseFloat(document.getElementById('p-qty1').value) || 0;
     const b2     = parseFloat(document.getElementById('p-buy2').value) || 0;
@@ -511,12 +518,15 @@
     const custSL = parseFloat(document.getElementById('p-custom-sl').value) || 0;
 
     if (!name || !b1 || !q1) { showToast('종목명, 1차 매수가, 수량 필수'); return; }
+    if (!planRegime) { showToast('장세(상승장/박스장/하락장)를 선택하세요'); return; }
 
-    const plan = { id: Date.now(), date, name, code, b1, q1, b2: b2||null, q2: q2||null, custSL: custSL||null, sells: [] };
+    const plan = { id: Date.now(), date, name, code, b1, q1, b2: b2||null, q2: q2||null, custSL: custSL||null, sells: [], regime: planRegime };
     plans.unshift(plan);
     renderPlans();
     ['p-name','p-code','p-buy1','p-qty1','p-buy2','p-qty2','p-custom-sl'].forEach(id => { document.getElementById(id).value = ''; });
     document.getElementById('p-date').value = new Date().toISOString().split('T')[0];
+    planRegime = null;
+    document.querySelectorAll('#subtab-add .regime-btn').forEach(b => b.classList.remove('active','r-up','r-box','r-down'));
     p2manual = false;
     fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ type: 'plan-save', plan }) });
     switchSubTab('wait');
@@ -538,6 +548,12 @@
     m = str.match(/^(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.?$/);
     if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
     return null;
+  }
+
+  function setPlanRegime(val, btn) {
+    planRegime = val;
+    document.querySelectorAll('#subtab-add .regime-btn').forEach(b => b.classList.remove('active', 'r-up', 'r-box', 'r-down'));
+    btn.classList.add('active', 'r-' + val);
   }
 
   // 주문일~오늘 사이 평일(월~금)만 카운트. 공휴일은 셈에 포함(Non-Goals).
