@@ -915,6 +915,7 @@
     }).filter(r => r.price > 0 && r.qty > 0 && r.date);
 
     if (!rows.length) { showToast('매도가/수량/매도일을 입력하세요.'); return; }
+    if (!resultVerdict) { showToast('승/패를 선택하세요'); return; }
 
     const remainQty = info.pool - info.sold;
     const newQty = rows.reduce((s, x) => s + x.qty, 0);
@@ -922,6 +923,7 @@
     if (newQty > remainQty) { showToast(`남은 수량(${remainQty}주)보다 많습니다.`); return; }
 
     plan.sells = plan.sells.concat(rows);
+    plan.verdict = resultVerdict;
     if (modalUse2 === true) plan.use2 = true;
 
     const hasB2 = !!(plan.b2 && plan.q2);
@@ -967,7 +969,8 @@
       // it is NOT the per-phase basis actually used to compute profit/rate above,
       // which is split via plan.b1 (phase 1) and phaseInfo(plan,true).base (phase 2).
       avg: Math.round(avg), sells: plan.sells, totalQty, profit, rate,
-      tax: totalTax, use2: plan.use2 === true, regime: plan.regime || null
+      tax: totalTax, use2: plan.use2 === true, regime: plan.regime || null,
+      verdict: plan.verdict || null
     });
     saveHistory(hist);
 
@@ -983,7 +986,7 @@
       Math.round(avg*1.03), Math.round(avg*1.05), Math.round(avg*1.07),
       Math.round(totalAmt*0.07),
       sellDateCol, sellPriceCol, profit, rate,
-      totalTax, status, memoCol, '', REGIME_LABEL[plan.regime] || '', '', '', '', '', ''
+      totalTax, status, memoCol, '', REGIME_LABEL[plan.regime] || '', VERDICT_LABEL[plan.verdict] || '', '', '', '', ''
     ];
     fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ row }) });
 
