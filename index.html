@@ -588,6 +588,17 @@
     return count;
   }
 
+  // 매도가 기준가 대비 어느 구간에 해당하는지 자동 판정.
+  // rate가 음수면 손절가 종류(커스텀/-7%자동) 구분 없이 무조건 '손절'.
+  const TIER_RANK = ['손절', '+3%목표부족', '+3%', '+5%', '+7%'];
+  function tierTag(rate) {
+    if (rate < 0) return '손절';
+    if (rate < 0.03) return '+3%목표부족';
+    if (rate < 0.05) return '+3%';
+    if (rate < 0.07) return '+5%';
+    return '+7%';
+  }
+
   function renderPlans() {
     const el = document.getElementById('plan-list');
     if (!plans.length) {
