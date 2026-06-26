@@ -158,6 +158,7 @@
     .hist-rate   { font-size: 11px; color: var(--muted); margin-top: 2px; }
     .hist-tax    { font-size: 11px; color: var(--red); margin-top: 2px; }
     .hist-del { background: none; border: none; color: var(--muted); font-size: 16px; cursor: pointer; padding: 4px; margin-left: 10px; }
+    .hist-edit { background: none; border: none; color: var(--muted); font-size: 16px; cursor: pointer; padding: 4px; margin-left: 6px; }
 
     /* 서브탭 */
     .subtab-bar { display: flex; gap: 8px; }
@@ -418,6 +419,21 @@
   </div>
 </div>
 
+<!-- 매매내역 수정 모달 -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal-box">
+    <div class="modal-title">거래 수정</div>
+    <label>종목명</label><input type="text" id="edit-name">
+    <label>종목코드</label><input type="text" id="edit-code">
+    <div id="edit-sell-rows"></div>
+    <button type="button" class="add-row-btn" onclick="addEditSellRow()">+ 매도 추가</button>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeEditModal()">취소</button>
+      <button class="modal-save" onclick="saveEditedHistory()">저장하기</button>
+    </div>
+  </div>
+</div>
+
 <!-- 하단 탭바 -->
 <nav class="tab-bar">
   <button class="tab-btn active" onclick="switchTab('plan',this)">
@@ -449,6 +465,7 @@
   const REGIME_LABEL = { up: '상승장', box: '박스장', down: '하락장' };
   let planRegime = null;     // 계획 추가 폼에서 선택한 장세
   let entryRegime = null;    // "입력" 탭에서 선택한 장세
+  let editHistId = null;     // 현재 매매내역 수정 모달에 열린 history id
 
   /* ── 탭 전환 ── */
   function switchTab(name, btn) {
@@ -760,6 +777,52 @@
     modalPlanId = null;
   }
 
+  function openEditModal(id) {
+    const hist = loadHistory();
+    const h = hist.find(x => x.id === id);
+    if (!h) return;
+    editHistId = id;
+    document.getElementById('edit-name').value = h.name || '';
+    document.getElementById('edit-code').value = h.code || '';
+    document.getElementById('edit-sell-rows').innerHTML = '';
+    (h.sells || []).forEach(s => addEditSellRow(s));
+    document.getElementById('edit-modal').classList.add('show');
+  }
+
+  function addEditSellRow(data) {
+    const wrap = document.getElementById('edit-sell-rows');
+    const div = document.createElement('div');
+    div.className = 'sell-row';
+    div.dataset.phase = data && data.phase ? data.phase : 1;
+    div.innerHTML = `
+      <div class="row2">
+        <div><label>매도가</label><input type="number" class="sr-price" placeholder="10300" value="${data ? data.price : ''}"></div>
+        <div><label>수량</label><input type="number" class="sr-qty" placeholder="50" value="${data ? data.qty : ''}"></div>
+      </div>
+      <div class="row2" style="margin-top:8px;">
+        <div><label>매도일</label><input type="date" class="sr-date" value="${data ? data.date : new Date().toISOString().split('T')[0]}"></div>
+        <div><label>세금 (원, 선택)</label><input type="number" class="sr-tax" placeholder="0" value="${data && data.tax ? data.tax : ''}"></div>
+      </div>
+      <div style="margin-top:8px;">
+        <label>메모 (선택)</label><input type="text" class="sr-memo" placeholder="예: 반등 약해서 일부 정리" value="${data && data.memo ? data.memo : ''}">
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:8px;">
+        <button type="button" class="sr-del" onclick="removeEditSellRow(this)">✕ 삭제</button>
+      </div>`;
+    wrap.appendChild(div);
+  }
+
+  function removeEditSellRow(btn) {
+    const wrap = document.getElementById('edit-sell-rows');
+    if (wrap.querySelectorAll('.sell-row').length <= 1) return;
+    btn.closest('.sell-row').remove();
+  }
+
+  function closeEditModal() {
+    document.getElementById('edit-modal').classList.remove('show');
+    editHistId = null;
+  }
+
   function saveResult() {
     const plan = plans.find(p => p.id === modalPlanId);
     if (!plan) return;
@@ -1012,6 +1075,7 @@
           <div class="hist-rate">${(h.rate*100)>=0?'+':''}${(h.rate*100).toFixed(2)}%</div>
           ${h.tax > 0 ? `<div class="hist-tax">세금 -${h.tax.toLocaleString('ko-KR')}원</div>` : ''}
         </div>
+        <button class="hist-edit" onclick="openEditModal(${h.id})">✎</button>
         <button class="hist-del" onclick="deleteHistory(${h.id})">✕</button>
       </div>`;
     }).join('');
@@ -1034,6 +1098,9 @@
   // 모달 오버레이 클릭 시 닫기
   document.getElementById('result-modal').addEventListener('click', function(e) {
     if (e.target === this) closeModal();
+  });
+  document.getElementById('edit-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeEditModal();
   });
 </script>
 </body>
