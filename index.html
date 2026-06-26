@@ -1085,10 +1085,32 @@
       '케이스'+currentCase, getReasons(),
       REGIME_LABEL[entryRegime] || '', '', '', '', document.getElementById('memo').value
     ];
+    if (sell > 0) {
+      const hist = loadHistory();
+      hist.unshift({
+        id: Date.now(),
+        date: document.getElementById('sellDate').value,
+        name: document.getElementById('stockName').value,
+        code: document.getElementById('stockCode').value,
+        status: statusVal,
+        avg: Math.round(avg),
+        sells: [{
+          price: sell, qty: totalQty,
+          date: document.getElementById('sellDate').value,
+          tax: 0, phase: 1,
+          memo: document.getElementById('memo').value,
+          tag: tierTag((sell - avg) / avg)
+        }],
+        totalQty, profit: Math.round((sell - avg) * totalQty),
+        rate: parseFloat(((sell - avg) / avg).toFixed(4)),
+        tax: 0, use2, regime: entryRegime || null, verdict: null
+      });
+      saveHistory(hist);
+    }
     const btn = document.getElementById('saveBtn');
     btn.textContent = '저장 중...'; btn.disabled = true;
     fetch(APPS_SCRIPT_URL, { method:'POST', mode:'no-cors', body:JSON.stringify({row}) })
-      .then(()=>{ showToast('✅ 저장 완료!'); resetForm(); })
+      .then(()=>{ showToast('✅ 저장 완료!'); resetForm(); renderHistory(); })
       .catch(()=>showToast('❌ 저장 실패.'))
       .finally(()=>{ btn.textContent='저장하기'; btn.disabled=false; });
   }
