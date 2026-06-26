@@ -151,12 +151,19 @@
     .summary-cell .sc-rate { font-size: 13px; font-weight: 700; margin-top: 4px; }
     .summary-cell .sc-rate.green { color: var(--green); }
     .summary-cell .sc-rate.red   { color: var(--red); }
+    .summary-cell .sc-verdict { font-size: 10px; font-weight: 600; margin-top: 2px; }
+    .summary-cell .sc-verdict.green { color: var(--green); }
+    .summary-cell .sc-verdict.red   { color: var(--red); }
     .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; text-align: center; }
     .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
     .stat-val { font-size: 20px; font-weight: 700; }
     .stat-val.green { color: var(--green); }
     .stat-val.red   { color: var(--red); }
+    .stat-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
     .hist-item { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+    .hist-verdict { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 4px; display: inline-block; margin-bottom: 4px; }
+    .hist-verdict.green { color: var(--green); background: rgba(46,213,115,0.12); }
+    .hist-verdict.red   { color: var(--red);   background: rgba(255,71,87,0.12); }
     .hist-left .hist-name { font-size: 14px; font-weight: 600; }
     .hist-left .hist-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
     .hist-right { text-align: right; }
@@ -1154,6 +1161,7 @@
 
     const total = hist.reduce((s,h)=>s+h.profit, 0);
     const wins  = hist.filter(h => h.verdict ? h.verdict === 'win' : h.profit >= 0).length;
+    const losses = hist.length - wins;
     const rate  = (wins/hist.length*100).toFixed(0);
     const avgR  = (hist.reduce((s,h)=>s+h.rate,0)/hist.length*100).toFixed(2);
     const capital = parseFloat(localStorage.getItem('jb-capital')) || 0;
@@ -1163,7 +1171,7 @@
 
     grid.innerHTML = `
       <div class="stat-card"><div class="stat-label">총 수익금</div><div class="stat-val ${total>=0?'green':'red'}">${total>=0?'+':''}${total.toLocaleString('ko-KR')}원</div></div>
-      <div class="stat-card"><div class="stat-label">승률</div><div class="stat-val ${wins/hist.length>=0.5?'green':'red'}">${rate}%</div></div>
+      <div class="stat-card"><div class="stat-label">승률</div><div class="stat-val ${wins/hist.length>=0.5?'green':'red'}">${rate}%</div><div class="stat-sub">${wins}승 ${losses}패</div></div>
       <div class="stat-card"><div class="stat-label">거래 수</div><div class="stat-val">${hist.length}건</div></div>
       <div class="stat-card"><div class="stat-label">${rateLabel}</div><div class="stat-val ${rateVal>=0?'green':'red'}">${rateVal>=0?'+':''}${rateVal}%</div></div>`;
 
@@ -1175,10 +1183,12 @@
       <div class="summary-cell">
         <div class="sc-name">${h.name}</div>
         <div class="sc-rate ${rateClass}">${sRate>=0?'+':''}${sRate}%</div>
+        <div class="sc-verdict ${rateClass}">${isWin?'승':'패'}</div>
       </div>`;
     }).join('');
 
     list.innerHTML = hist.map(h => {
+      const isWin = h.verdict ? h.verdict === 'win' : h.profit >= 0;
       const sellLines = (h.sells || []).map(s => {
         const tag = h.use2 ? (s.phase === 2 ? ' <span style="color:var(--orange);">[평단]</span>' : ' <span style="color:var(--blue);">[1차]</span>') : '';
         const tierBadge = s.tag ? ` <span style="color:var(--accent);">[${s.tag}]</span>` : '';
@@ -1194,6 +1204,7 @@
           ${sellLines}
         </div>
         <div class="hist-right">
+          <div class="hist-verdict ${isWin?'green':'red'}">${isWin?'승':'패'}</div>
           <div class="hist-profit ${h.profit>=0?'green':'red'}">${h.profit>=0?'+':''}${h.profit.toLocaleString('ko-KR')}원</div>
           <div class="hist-rate">${(h.rate*100)>=0?'+':''}${(h.rate*100).toFixed(2)}%</div>
           ${h.tax > 0 ? `<div class="hist-tax">세금 -${h.tax.toLocaleString('ko-KR')}원</div>` : ''}
