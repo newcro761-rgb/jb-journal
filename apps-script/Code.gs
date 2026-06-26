@@ -18,7 +18,8 @@ function doPost(e) {
       p.id, p.date, p.name, p.code,
       p.b1, p.q1, p.b2 || '', p.q2 || '', p.custSL || '',
       JSON.stringify(p.sells || []),
-      p.use2 === undefined ? '' : p.use2
+      p.use2 === undefined ? '' : p.use2,
+      p.regime || ''
     ]);
     return ContentService.createTextOutput(JSON.stringify({result:'OK'}))
       .setMimeType(ContentService.MimeType.JSON);
@@ -31,11 +32,12 @@ function doPost(e) {
     const values = sheet.getDataRange().getValues();
     for (let i = 0; i < values.length; i++) {
       if (String(values[i][0]) === String(p.id)) {
-        sheet.getRange(i + 1, 1, 1, 11).setValues([[
+        sheet.getRange(i + 1, 1, 1, 12).setValues([[
           p.id, p.date, p.name, p.code,
           p.b1, p.q1, p.b2 || '', p.q2 || '', p.custSL || '',
           JSON.stringify(p.sells || []),
-          p.use2 === undefined ? '' : p.use2
+          p.use2 === undefined ? '' : p.use2,
+          p.regime || ''
         ]]);
         break;
       }
