@@ -761,14 +761,18 @@
 
     const info = phaseInfo(plan, modalUse2);
 
-    const rows = Array.from(document.querySelectorAll('#sell-rows .sell-row')).map(row => ({
-      price: parseFloat(row.querySelector('.sr-price').value) || 0,
-      qty: parseFloat(row.querySelector('.sr-qty').value) || 0,
-      date: row.querySelector('.sr-date').value,
-      tax: parseFloat(row.querySelector('.sr-tax').value) || 0,
-      phase: info.phase,
-      memo: row.querySelector('.sr-memo').value.trim()
-    })).filter(r => r.price > 0 && r.qty > 0 && r.date);
+    const rows = Array.from(document.querySelectorAll('#sell-rows .sell-row')).map(row => {
+      const price = parseFloat(row.querySelector('.sr-price').value) || 0;
+      return {
+        price,
+        qty: parseFloat(row.querySelector('.sr-qty').value) || 0,
+        date: row.querySelector('.sr-date').value,
+        tax: parseFloat(row.querySelector('.sr-tax').value) || 0,
+        phase: info.phase,
+        memo: row.querySelector('.sr-memo').value.trim(),
+        tag: tierTag((price - info.base) / info.base)
+      };
+    }).filter(r => r.price > 0 && r.qty > 0 && r.date);
 
     if (!rows.length) { showToast('매도가/수량/매도일을 입력하세요.'); return; }
 
@@ -810,7 +814,10 @@
     const totalTax = plan.sells.reduce((s, x) => s + (x.tax || 0), 0);
     const profit = Math.round(profit1 + profit2 - totalTax);
     const rate = parseFloat((profit / totalAmt).toFixed(4));
-    const status = (profit >= 0 ? '수익' : '손절') + `(${plan.sells.length}차분할)`;
+    const bestTag = plan.sells.reduce((best, s) =>
+      TIER_RANK.indexOf(s.tag) > TIER_RANK.indexOf(best) ? s.tag : best,
+      plan.sells[0].tag);
+    const status = (profit >= 0 ? '수익' : '손절') + `(${plan.sells.length}차분할) · 최고 ${bestTag}`;
 
     const hist = loadHistory();
     hist.unshift({
@@ -825,7 +832,7 @@
     saveHistory(hist);
 
     const sellDateCol  = plan.sells.map(s => s.date).join(' / ');
-    const sellPriceCol = plan.sells.map(s => `${s.price}(${s.qty}주)`).join(' / ');
+    const sellPriceCol = plan.sells.map(s => `${s.price}(${s.qty}주)[${s.tag}]`).join(' / ');
     const memoCol = plan.sells.filter(s => s.memo).map(s => `${s.date}: ${s.memo}`).join(' / ');
     const b2 = use2 ? plan.b2 : 0, q2 = use2 ? plan.q2 : 0;
     const row = [
