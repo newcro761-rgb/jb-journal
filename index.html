@@ -426,6 +426,7 @@
   let p2manual = false;      // 2차 매수가 수동 입력 여부
   let modalPlanId = null;    // 현재 모달에 열린 plan id
   let modalUse2 = true;      // 모달에서 2차 매수 실제 체결 여부 토글 상태
+  const REGIME_LABEL = { up: '상승장', box: '박스장', down: '하락장' };
 
   /* ── 탭 전환 ── */
   function switchTab(name, btn) {
@@ -526,6 +527,32 @@
     plans = plans.filter(p => p.id !== id);
     renderPlans();
     fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ type: 'plan-delete', id }) });
+  }
+
+  // ISO("YYYY-MM-DD")와 기존 한글 로케일("2026. 6. 24.") 둘 다 인식.
+  // 매칭 실패 시 null — 호출부는 null이면 D+n을 표시하지 않고 날짜 원문만 보여준다.
+  function parsePlanDate(str) {
+    if (!str) return null;
+    let m = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+    m = str.match(/^(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.?$/);
+    if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+    return null;
+  }
+
+  // 주문일~오늘 사이 평일(월~금)만 카운트. 공휴일은 셈에 포함(Non-Goals).
+  function tradingDaysSince(str) {
+    const start = parsePlanDate(str);
+    if (!start) return null;
+    const d = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    let count = 0;
+    while (d < today) {
+      d.setDate(d.getDate() + 1);
+      const dow = d.getDay();
+      if (dow !== 0 && dow !== 6) count++;
+    }
+    return count;
   }
 
   function renderPlans() {
