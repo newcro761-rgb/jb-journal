@@ -941,7 +941,7 @@
     const totalQty = (hasB2 && plan.use2 === true) ? plan.q1 + plan.q2 : plan.q1;
     const allSoldQty = plan.sells.reduce((s, x) => s + x.qty, 0);
 
-    if (allSoldQty === totalQty && !(hasB2 && plan.use2 !== true)) {
+    if (allSoldQty === totalQty) {
       finalizePlan(plan);
       closeModal();
       showToast('✅ 저장 완료!');
