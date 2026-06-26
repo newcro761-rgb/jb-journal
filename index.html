@@ -174,6 +174,13 @@
     .regime-btn.active.r-up   { border-color: var(--green);  color: var(--green);  background: rgba(46,213,115,0.1); }
     .regime-btn.active.r-box  { border-color: var(--orange); color: var(--orange); background: rgba(255,165,2,0.1); }
     .regime-btn.active.r-down { border-color: var(--red);    color: var(--red);    background: rgba(255,71,87,0.1); }
+    .verdict-btns { display: flex; gap: 8px; margin-top: 10px; }
+    .verdict-btn {
+      flex: 1; padding: 10px 4px; border: 2px solid var(--border); background: var(--input-bg);
+      color: var(--muted); border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; text-align: center;
+    }
+    .verdict-btn.active.v-win  { border-color: var(--green); color: var(--green); background: rgba(46,213,115,0.1); }
+    .verdict-btn.active.v-lose { border-color: var(--red);   color: var(--red);   background: rgba(255,71,87,0.1); }
     .pc-regime {
       display: inline-block; font-size: 9px; font-weight: 700; padding: 1px 6px;
       border-radius: 8px; margin-bottom: 4px;
@@ -412,6 +419,10 @@
     </div>
     <div id="sell-rows"></div>
     <button type="button" class="add-row-btn" id="add-sell-row-btn" onclick="addSellRow()">+ 매도 추가</button>
+    <div class="verdict-btns">
+      <button type="button" class="verdict-btn" data-verdict="win" onclick="setVerdict('win',this)">승</button>
+      <button type="button" class="verdict-btn" data-verdict="lose" onclick="setVerdict('lose',this)">패</button>
+    </div>
     <div class="modal-actions">
       <button class="modal-cancel" onclick="closeModal()">취소</button>
       <button class="modal-save" onclick="saveResult()">저장하기</button>
@@ -466,6 +477,8 @@
   let planRegime = null;     // 계획 추가 폼에서 선택한 장세
   let entryRegime = null;    // "입력" 탭에서 선택한 장세
   let editHistId = null;     // 현재 매매내역 수정 모달에 열린 history id
+  const VERDICT_LABEL = { win: '승', lose: '패' };
+  let resultVerdict = null;  // 결과입력 모달에서 선택한 승/패
 
   /* ── 탭 전환 ── */
   function switchTab(name, btn) {
@@ -687,6 +700,12 @@
   }
 
   /* ── 결과 입력 모달 ── */
+  function setVerdict(val, btn) {
+    resultVerdict = val;
+    document.querySelectorAll('#result-modal .verdict-btn').forEach(b => b.classList.remove('active', 'v-win', 'v-lose'));
+    btn.classList.add('active', 'v-' + val);
+  }
+
   function openModal(id) {
     const plan = plans.find(p => p.id === id);
     if (!plan) return;
@@ -707,6 +726,15 @@
 
     document.getElementById('sell-rows').innerHTML = '';
     addSellRow();
+
+    resultVerdict = plan.verdict || null;
+    document.querySelectorAll('#result-modal .verdict-btn').forEach(b => {
+      b.classList.remove('active', 'v-win', 'v-lose');
+    });
+    if (resultVerdict) {
+      const vbtn = document.querySelector(`#result-modal .verdict-btn[data-verdict="${resultVerdict}"]`);
+      if (vbtn) vbtn.classList.add('active', 'v-' + resultVerdict);
+    }
 
     document.getElementById('result-modal').classList.add('show');
   }
