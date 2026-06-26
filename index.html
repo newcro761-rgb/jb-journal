@@ -609,11 +609,20 @@
         ? `<div class="pc-progress">매도진행: ${soldQty}주 · 평균 ${Math.round(sells.reduce((s,x)=>s+x.price*x.qty,0)/soldQty).toLocaleString('ko-KR')}원</div>`
         : '';
 
+      const dn = tradingDaysSince(p.date);
+      const warnNow = dn !== null && dn >= 3;
+      const orderLine = dn !== null
+        ? `<div class="pc-order-date${warnNow ? ' warn' : ''}">주문 ${p.date} · D+${dn}${warnNow ? ' ⚠️' : ''}</div>`
+        : `<div class="pc-order-date">주문 ${p.date}</div>`;
+      const regimeBadge = p.regime ? `<span class="pc-regime r-${p.regime}">${REGIME_LABEL[p.regime]}</span>` : '';
+
       return `
         <div class="pc">
           <button class="pc-del" onclick="deletePlan(${p.id})">✕</button>
           <div class="pc-name">${p.name}</div>
-          <div class="pc-code">${p.code || p.date}</div>
+          <div class="pc-code">${p.code || ''}</div>
+          ${regimeBadge}
+          ${orderLine}
           <div class="pc-row"><span class="pc-lbl">1차</span><span class="pc-val">${p.b1.toLocaleString('ko-KR')}</span></div>
           <div class="pc-row"><span class="pc-lbl">손절</span><span class="pc-val red">${sl1.toLocaleString('ko-KR')}</span></div>
           ${sl1Ref}
