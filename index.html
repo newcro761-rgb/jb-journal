@@ -976,8 +976,9 @@
     list.innerHTML = hist.map(h => {
       const sellLines = (h.sells || []).map(s => {
         const tag = h.use2 ? (s.phase === 2 ? ' <span style="color:var(--orange);">[평단]</span>' : ' <span style="color:var(--blue);">[1차]</span>') : '';
+        const tierBadge = s.tag ? ` <span style="color:var(--accent);">[${s.tag}]</span>` : '';
         const memo = s.memo ? ` — ${s.memo}` : '';
-        return `<div class="hist-meta">${s.date} · ${(s.price || 0).toLocaleString('ko-KR')}원 × ${s.qty}주${tag}${memo}</div>`;
+        return `<div class="hist-meta">${s.date} · ${(s.price || 0).toLocaleString('ko-KR')}원 × ${s.qty}주${tag}${tierBadge}${memo}</div>`;
       }).join('');
 
       return `
