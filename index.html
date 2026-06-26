@@ -145,6 +145,12 @@
 
     /* 매매내역 탭 */
     .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+    .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .summary-cell { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 8px 6px; text-align: center; }
+    .summary-cell .sc-name { font-size: 11px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .summary-cell .sc-rate { font-size: 13px; font-weight: 700; margin-top: 4px; }
+    .summary-cell .sc-rate.green { color: var(--green); }
+    .summary-cell .sc-rate.red   { color: var(--red); }
     .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; text-align: center; }
     .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
     .stat-val { font-size: 20px; font-weight: 700; }
@@ -384,6 +390,11 @@
     </div>
 
     <div class="stat-grid" id="stat-grid"></div>
+
+    <div class="section" style="padding:10px 14px;">
+      <div class="section-title">최근 9건 요약</div>
+      <div class="summary-grid" id="summary-grid"></div>
+    </div>
 
     <div class="section" style="padding:10px 14px;">
       <div class="section-title">최근 거래</div>
@@ -1111,12 +1122,13 @@
 
     if (!hist.length) {
       grid.innerHTML = '';
+      document.getElementById('summary-grid').innerHTML = '';
       list.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:24px 0;">아직 기록이 없습니다.</div>';
       return;
     }
 
     const total = hist.reduce((s,h)=>s+h.profit, 0);
-    const wins  = hist.filter(h=>h.profit>0).length;
+    const wins  = hist.filter(h => h.verdict ? h.verdict === 'win' : h.profit >= 0).length;
     const rate  = (wins/hist.length*100).toFixed(0);
     const avgR  = (hist.reduce((s,h)=>s+h.rate,0)/hist.length*100).toFixed(2);
     const capital = parseFloat(localStorage.getItem('jb-capital')) || 0;
@@ -1129,6 +1141,17 @@
       <div class="stat-card"><div class="stat-label">승률</div><div class="stat-val ${wins/hist.length>=0.5?'green':'red'}">${rate}%</div></div>
       <div class="stat-card"><div class="stat-label">거래 수</div><div class="stat-val">${hist.length}건</div></div>
       <div class="stat-card"><div class="stat-label">${rateLabel}</div><div class="stat-val ${rateVal>=0?'green':'red'}">${rateVal>=0?'+':''}${rateVal}%</div></div>`;
+
+    document.getElementById('summary-grid').innerHTML = hist.slice(0, 9).map(h => {
+      const isWin = h.verdict ? h.verdict === 'win' : h.profit >= 0;
+      const rateClass = isWin ? 'green' : 'red';
+      const sRate = (h.rate * 100).toFixed(2);
+      return `
+      <div class="summary-cell">
+        <div class="sc-name">${h.name}</div>
+        <div class="sc-rate ${rateClass}">${sRate>=0?'+':''}${sRate}%</div>
+      </div>`;
+    }).join('');
 
     list.innerHTML = hist.map(h => {
       const sellLines = (h.sells || []).map(s => {
