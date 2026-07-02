@@ -207,6 +207,12 @@
     }
     .pc-order-date { font-size: 10px; color: var(--muted); margin-bottom: 6px; }
     .pc-order-date.warn { color: var(--red); font-weight: 700; }
+    .pmc-verdict-row { display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.06); font-size:13px; }
+    .pmc-verdict-row:last-child { border-bottom:none; }
+    .pmc-badge { font-size:11px; font-weight:700; padding:2px 8px; border-radius:10px; }
+    .pmc-badge.ok     { color: var(--green);  background: rgba(46,213,115,0.15); }
+    .pmc-badge.reduce { color: var(--orange); background: rgba(255,165,2,0.15); }
+    .pmc-badge.cancel { color: var(--red);    background: rgba(255,71,87,0.15); }
   </style>
 </head>
 <body>
@@ -215,6 +221,13 @@
   <!-- ======== 탭1: 계획 ======== -->
   <div id="tab-plan" class="tab-content active">
     <div class="page-title">매매 계획</div>
+
+    <div id="premarket-card" class="section hidden" style="margin-top:8px;">
+      <div class="section-title">오늘의 미장 체크</div>
+      <div id="pmc-indices" style="font-size:13px;color:var(--muted);margin-bottom:8px;"></div>
+      <div id="pmc-themes" style="font-size:12px;margin-bottom:10px;"></div>
+      <div id="pmc-verdicts"></div>
+    </div>
 
     <!-- 서브탭 -->
     <div class="subtab-bar">
@@ -514,6 +527,30 @@
     document.getElementById('p-theme-pills').innerHTML = THEME_OPTIONS.map(t =>
       `<span class="pill" data-theme="${t}" onclick="togglePlanTheme('${t}', this)">${t}</span>`
     ).join('');
+  }
+
+  const PMC_LABEL = { ok: '정상', reduce: '비중축소', cancel: '매수취소' };
+
+  function loadPremarketCheck() {
+    const today = new Date().toISOString().split('T')[0];
+    fetch(`${APPS_SCRIPT_URL}?action=getPremarketCheck&date=${today}`)
+      .then(r => r.json())
+      .then(check => {
+        const card = document.getElementById('premarket-card');
+        if (!check) { card.classList.add('hidden'); return; }
+        card.classList.remove('hidden');
+        const idx = check.indices || {};
+        document.getElementById('pmc-indices').textContent =
+          Object.entries(idx).map(([name, pct]) => `${name} ${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`).join(' | ') || '지수 데이터 없음';
+        const up = (check.themesUp || []).map(t => `${t.theme} ${t.pct >= 0 ? '+' : ''}${t.pct.toFixed(1)}%`).join(' / ');
+        const down = (check.themesDown || []).map(t => `${t.theme} ${t.pct >= 0 ? '+' : ''}${t.pct.toFixed(1)}%`).join(' / ');
+        document.getElementById('pmc-themes').innerHTML =
+          (up ? `📈 ${up}<br>` : '') + (down ? `📉 ${down}` : '');
+        document.getElementById('pmc-verdicts').innerHTML = (check.verdicts || []).map(v =>
+          `<div class="pmc-verdict-row"><span>${v.name} <span style="color:var(--muted);font-size:11px;">${(v.themes||[]).join('/')}</span></span><span class="pmc-badge ${v.verdict}">${PMC_LABEL[v.verdict]}</span></div>`
+        ).join('');
+      })
+      .catch(() => { document.getElementById('premarket-card').classList.add('hidden'); });
   }
 
   function togglePlanTheme(theme, el) {
@@ -1262,6 +1299,7 @@
     document.getElementById('p-date').value = new Date().toISOString().split('T')[0];
     renderThemePills();
     initPlans();
+    loadPremarketCheck();
   });
 
   // 모달 오버레이 클릭 시 닫기
