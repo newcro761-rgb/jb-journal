@@ -223,7 +223,7 @@
     <div class="page-title">매매 계획</div>
 
     <div id="premarket-card" class="section hidden" style="margin-top:8px;">
-      <div class="section-title">오늘의 미장 체크</div>
+      <div class="section-title">오늘의 미장 체크 <span id="pmc-date" style="color:var(--muted);font-weight:400;text-transform:none;"></span></div>
       <div id="pmc-indices" style="font-size:13px;color:var(--muted);margin-bottom:8px;"></div>
       <div id="pmc-themes" style="font-size:12px;margin-bottom:10px;"></div>
       <div id="pmc-verdicts"></div>
@@ -532,13 +532,16 @@
   const PMC_LABEL = { ok: '정상', reduce: '비중축소', cancel: '매수취소' };
 
   function loadPremarketCheck() {
-    const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
     fetch(`${APPS_SCRIPT_URL}?action=getPremarketCheck&date=${today}`)
       .then(r => r.json())
       .then(check => {
         const card = document.getElementById('premarket-card');
         if (!check) { card.classList.add('hidden'); return; }
         card.classList.remove('hidden');
+        const dm = (check.date || '').match(/^\d{4}-(\d{2})-(\d{2})/);
+        document.getElementById('pmc-date').textContent = dm ? `(${Number(dm[1])}/${Number(dm[2])} 기준)` : '';
         const idx = check.indices || {};
         document.getElementById('pmc-indices').textContent =
           Object.entries(idx).map(([name, pct]) => `${name} ${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`).join(' | ') || '지수 데이터 없음';
