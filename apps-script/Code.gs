@@ -15,6 +15,18 @@ function doGet(e) {
   return ContentService.createTextOutput(JSON.stringify(values)).setMimeType(ContentService.MimeType.JSON);
 }
 
+function normalizeDateStr_(v) {
+  if (Object.prototype.toString.call(v) === '[object Date]') {
+    return Utilities.formatDate(v, SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone(), 'yyyy-MM-dd');
+  }
+  var s = String(v || '');
+  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return m[1] + '-' + m[2] + '-' + m[3];
+  m = s.match(/^(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.?/);
+  if (m) return m[1] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[3]).slice(-2);
+  return s;
+}
+
 function getTodayPlans_(ss, dateStr) {
   const sheet = ss.getSheetByName('Plans');
   if (!sheet || !dateStr) return ContentService.createTextOutput(JSON.stringify([])).setMimeType(ContentService.MimeType.JSON);
@@ -23,7 +35,7 @@ function getTodayPlans_(ss, dateStr) {
   for (let i = 0; i < values.length; i++) {
     const r = values[i];
     if (!r[0]) continue;
-    if (String(r[1]) !== dateStr) continue;
+    if (normalizeDateStr_(r[1]) !== dateStr) continue;
     out.push({
       id: r[0], date: r[1], name: r[2], ticker: r[3],
       entry1: r[4], qty1: r[5], entry2: r[6] || null, qty2: r[7] || null,
@@ -53,6 +65,7 @@ function doPost(e) {
   if (data.type === 'plan-save') {
     let sheet = ss.getSheetByName('Plans');
     if (!sheet) sheet = ss.insertSheet('Plans');
+    sheet.getRange('B2:B').setNumberFormat('@');
     const p = data.plan;
     sheet.appendRow([
       p.id, p.date, p.name, p.code,
