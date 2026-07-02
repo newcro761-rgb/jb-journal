@@ -152,3 +152,154 @@ def judge_stock(themes, theme_scores, pct, sox_pct):
     if best_verdict == "ok":
         return "ok", ("미장 무관" if not any_mapped else "정상 범위")
     return best_verdict, " / ".join(reasons)
+
+
+VERDICT_EMOJI = {"cancel": "🚫", "reduce": "⚠️", "ok": "✅"}
+VERDICT_TEXT = {"cancel": "매수 취소 권고", "reduce": "비중 50% 축소", "ok": "정상"}
+
+DRY_RUN = False
+
+
+def _env(name):
+    val = os.environ.get(name)
+    if not val:
+        raise RuntimeError(f"missing required env var: {name}")
+    return val
+
+
+def send_telegram(text):
+    if DRY_RUN:
+        print("=== TELEGRAM (dry-run) ===")
+        print(text)
+        return
+    token = _env("TELEGRAM_BOT_TOKEN")
+    chat_id = _env("TELEGRAM_CHAT_ID")
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    for i in range(0, len(text), 4000):
+        chunk = text[i:i + 4000]
+        r = requests.post(url, data={"chat_id": chat_id, "text": chunk}, timeout=15)
+        r.raise_for_status()
+
+
+def fetch_today_plans(date_str):
+    url = _env("APPS_SCRIPT_URL")
+    r = requests.get(url, params={"action": "getTodayPlans", "date": date_str}, timeout=15)
+    r.raise_for_status()
+    return r.json()
+
+
+def post_check_result(result):
+    if DRY_RUN:
+        print("=== APPS SCRIPT POST (dry-run) ===")
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+    url = _env("APPS_SCRIPT_URL")
+    body = {"type": "premarket-check-save", **result}
+    r = requests.post(
+        url,
+        data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+        headers={"Content-Type": "text/plain;charset=UTF-8"},
+        timeout=15,
+    )
+    r.raise_for_status()
+    if r.json().get("result") != "OK":
+        raise RuntimeError(f"premarket-check-save did not return OK: {r.text}")
+
+
+def build_message(run_dt, idx_pct, up3, down3, verdicts, market_note=None):
+    lines = [f"📊 미장 체크 {run_dt.strftime('%m/%d')} ({run_dt.strftime('%H:%M')})"]
+    if market_note:
+        lines.append(market_note)
+        return "\n".join(lines)
+
+    lines.append(" | ".join(f"{name} {v:+.2f}%" for name, v in idx_pct.items()))
+    lines.append("")
+    if up3:
+        lines.append("📈 상승: " + " / ".join(f"{t} {s:+.1f}%" for t, s in up3))
+    if down3:
+        lines.append("📉 하락: " + " / ".join(f"{t} {s:+.1f}%" for t, s in down3))
+    lines.append("")
+    if verdicts:
+        lines.append("[오늘 매수 계획 판정]")
+        for v in verdicts:
+            emoji = VERDICT_EMOJI[v["verdict"]]
+            theme_str = "/".join(v["themes"]) if v["themes"] else "테마없음"
+            lines.append(f"{emoji} {v['name']} ({theme_str}) — {v['reason']} → {VERDICT_TEXT[v['verdict']]}")
+    else:
+        lines.append("오늘 등록된 매수 계획이 없습니다.")
+    return "\n".join(lines)
+
+
+def parse_args():
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--asof", help="YYYY-MM-DD — backtest override for 'today' (KST)")
+    p.add_argument("--dry-run", action="store_true", help="print instead of sending Telegram/Sheets")
+    return p.parse_args()
+
+
+def main():
+    global DRY_RUN
+    args = parse_args()
+    DRY_RUN = args.dry_run
+    run_dt = datetime.strptime(args.asof, "%Y-%m-%d").replace(tzinfo=KST) if args.asof else kst_now()
+    asof_date = run_dt.date() if args.asof else None
+
+    if is_kr_market_holiday(run_dt):
+        print(f"{run_dt.date()} — KR market holiday/weekend, skipping.")
+        return
+
+    all_tickers = sorted(
+        {t for proxies in THEME_PROXY.values() if proxies for t in proxies}
+        | set(INDEX_TICKERS.values())
+    )
+
+    try:
+        pct, last_dates = fetch_prices(all_tickers, end_date=asof_date)
+    except Exception as e:
+        send_telegram(f"❌ 미장 체크 실패, 수동 확인 요망\n{run_dt.strftime('%m/%d %H:%M')} KST\n원인: {e}")
+        sys.exit(1)
+
+    expected_date = expected_last_us_trading_date(run_dt)
+    sox_date = last_dates["^SOX"]
+    if sox_date < expected_date - timedelta(days=3):
+        send_telegram(
+            f"❌ 미장 체크 실패, 수동 확인 요망\n{run_dt.strftime('%m/%d %H:%M')} KST\n"
+            f"원인: 가격 데이터가 {sox_date} 이후 갱신되지 않음"
+        )
+        sys.exit(1)
+    if sox_date < expected_date:
+        send_telegram(build_message(run_dt, {}, [], [], [], market_note="🔔 미장 휴장 — 필터 미적용"))
+        post_check_result({
+            "date": run_dt.strftime("%Y-%m-%d"), "checkedAt": run_dt.isoformat(),
+            "marketOpen": False, "indices": {}, "themesUp": [], "themesDown": [], "verdicts": [],
+        })
+        return
+
+    idx_pct = {name: pct[tk] for name, tk in INDEX_TICKERS.items()}
+    theme_scores = compute_theme_scores(pct)
+    ranked = sorted(theme_scores.items(), key=lambda x: x[1], reverse=True)
+    up3, down3 = ranked[:3], ranked[-3:][::-1]
+
+    plans = fetch_today_plans(run_dt.strftime("%Y-%m-%d"))
+    verdicts = []
+    for p in plans:
+        themes = p.get("themes") or []
+        verdict, reason = judge_stock(themes, theme_scores, pct, idx_pct["필라델피아반도체"])
+        verdicts.append({
+            "ticker": p.get("ticker"), "name": p.get("name"),
+            "themes": themes, "verdict": verdict, "reason": reason,
+        })
+
+    send_telegram(build_message(run_dt, idx_pct, up3, down3, verdicts))
+    post_check_result({
+        "date": run_dt.strftime("%Y-%m-%d"), "checkedAt": run_dt.isoformat(),
+        "marketOpen": True,
+        "indices": {k: round(v, 2) for k, v in idx_pct.items()},
+        "themesUp": [{"theme": t, "pct": round(s, 2)} for t, s in up3],
+        "themesDown": [{"theme": t, "pct": round(s, 2)} for t, s in down3],
+        "verdicts": verdicts,
+    })
+
+
+if __name__ == "__main__":
+    main()
