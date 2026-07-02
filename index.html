@@ -201,6 +201,10 @@
     .pc-regime.r-up   { background: rgba(46,213,115,0.15); color: var(--green); }
     .pc-regime.r-box  { background: rgba(255,165,2,0.15);  color: var(--orange); }
     .pc-regime.r-down { background: rgba(255,71,87,0.15);  color: var(--red); }
+    .pc-theme {
+      display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 10px;
+      background: rgba(30,144,255,0.15); color: var(--blue); margin: 2px 4px 2px 0;
+    }
     .pc-order-date { font-size: 10px; color: var(--muted); margin-bottom: 6px; }
     .pc-order-date.warn { color: var(--red); font-weight: 700; }
   </style>
@@ -267,6 +271,10 @@
             <label>2차 수량</label>
             <input type="number" id="p-qty2" placeholder="100">
           </div>
+        </div>
+        <div style="margin-top:8px;">
+          <label>테마 <span style="color:var(--muted);font-weight:400;">(최대 2개, 미장 프리마켓 체크용)</span></label>
+          <div class="pills" id="p-theme-pills"></div>
         </div>
         <button class="save-btn" style="margin-top:12px;" onclick="addPlanAndSwitch()">+ 목록에 추가</button>
       </div>
@@ -499,6 +507,27 @@
   const VERDICT_LABEL = { win: '승', lose: '패' };
   let resultVerdict = null;  // 결과입력 모달에서 선택한 승/패
 
+  const THEME_OPTIONS = ['반도체장비','메모리반도체','AI반도체','반도체소재부품','2차전지','바이오','방산','조선','원전','로봇','소프트웨어/AI서비스','사이버보안','금융','에너지/정유','우주항공','엔터','화장품','게임','정치테마','기타(미장무관)'];
+  let planThemes = []; // 계획 추가 폼에서 선택한 테마 (최대 2개)
+
+  function renderThemePills() {
+    document.getElementById('p-theme-pills').innerHTML = THEME_OPTIONS.map(t =>
+      `<span class="pill" data-theme="${t}" onclick="togglePlanTheme('${t}', this)">${t}</span>`
+    ).join('');
+  }
+
+  function togglePlanTheme(theme, el) {
+    const i = planThemes.indexOf(theme);
+    if (i >= 0) {
+      planThemes.splice(i, 1);
+      el.classList.remove('active');
+    } else {
+      if (planThemes.length >= 2) { showToast('테마는 최대 2개까지 선택 가능'); return; }
+      planThemes.push(theme);
+      el.classList.add('active');
+    }
+  }
+
   /* ── 탭 전환 ── */
   function switchTab(name, btn) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
@@ -561,7 +590,8 @@
           custSL: r[8] ? Number(r[8]) : null,
           sells: r[9] ? JSON.parse(r[9]) : [],
           use2: r[10] === true || r[10] === 'true' ? true : (r[10] === false || r[10] === 'false' ? false : undefined),
-          regime: r[11] || null
+          regime: r[11] || null,
+          themes: r[12] ? JSON.parse(r[12]) : []
         }));
         renderPlans();
       })
@@ -585,13 +615,15 @@
     if (!name || !b1 || !q1) { showToast('종목명, 1차 매수가, 수량 필수'); return; }
     if (!planRegime) { showToast('장세(상승장/박스장/하락장)를 선택하세요'); return; }
 
-    const plan = { id: Date.now(), date, name, code, b1, q1, b2: b2||null, q2: q2||null, custSL: custSL||null, sells: [], regime: planRegime };
+    const plan = { id: Date.now(), date, name, code, b1, q1, b2: b2||null, q2: q2||null, custSL: custSL||null, sells: [], regime: planRegime, themes: planThemes.slice() };
     plans.unshift(plan);
     renderPlans();
     ['p-name','p-code','p-buy1','p-qty1','p-buy2','p-qty2','p-custom-sl'].forEach(id => { document.getElementById(id).value = ''; });
     document.getElementById('p-date').value = new Date().toISOString().split('T')[0];
     planRegime = null;
     document.querySelectorAll('#subtab-add .regime-btn').forEach(b => b.classList.remove('active','r-up','r-box','r-down'));
+    planThemes = [];
+    document.querySelectorAll('#p-theme-pills .pill').forEach(el => el.classList.remove('active'));
     p2manual = false;
     fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ type: 'plan-save', plan }) });
     switchSubTab('wait');
@@ -697,6 +729,7 @@
         ? `<div class="pc-order-date${warnNow ? ' warn' : ''}">주문 ${p.date} · D+${dn}${warnNow ? ' ⚠️' : ''}</div>`
         : `<div class="pc-order-date">주문 ${p.date}</div>`;
       const regimeBadge = p.regime ? `<span class="pc-regime r-${p.regime}">${REGIME_LABEL[p.regime]}</span>` : '';
+      const themeBadges = (p.themes || []).map(t => `<span class="pc-theme">${t}</span>`).join('');
 
       return `
         <div class="pc">
@@ -704,6 +737,7 @@
           <div class="pc-name">${p.name}</div>
           <div class="pc-code">${p.code || ''}</div>
           ${regimeBadge}
+          ${themeBadges}
           ${orderLine}
           <div class="pc-row"><span class="pc-lbl">1차</span><span class="pc-val">${p.b1.toLocaleString('ko-KR')}</span></div>
           <div class="pc-row"><span class="pc-lbl">손절</span><span class="pc-val red">${sl1.toLocaleString('ko-KR')}</span></div>
@@ -1226,6 +1260,7 @@
     const urlEl = document.getElementById('sheets-url-display');
     if (urlEl) urlEl.textContent = SHEETS_URL;
     document.getElementById('p-date').value = new Date().toISOString().split('T')[0];
+    renderThemePills();
     initPlans();
   });
 
