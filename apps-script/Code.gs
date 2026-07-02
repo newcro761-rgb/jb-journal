@@ -51,7 +51,7 @@ function getPremarketCheck_(ss, dateStr) {
   if (!sheet || !dateStr) return ContentService.createTextOutput('null').setMimeType(ContentService.MimeType.JSON);
   const values = sheet.getDataRange().getValues();
   for (let i = values.length - 1; i >= 1; i--) {
-    if (String(values[i][0]) === dateStr) {
+    if (normalizeDateStr_(values[i][0]) === dateStr) {
       return ContentService.createTextOutput(values[i][2]).setMimeType(ContentService.MimeType.JSON);
     }
   }
