@@ -1307,8 +1307,14 @@
   }
 
   function getMergedHistory() {
-    const manual = loadHistory().map(h => ({ ...h, source: 'manual' }));
     const auto = autoTrades.filter(t => (t.sells || []).length > 0).map(normalizeAutoTrade);
+    // 자동 동기화가 커버하는 가장 이른 날짜 이후의 수동(✍️) 기록은 자동 기록과 같은 실거래를
+    // 중복으로 담고 있을 가능성이 높다(백필 이전엔 손으로 기록해뒀을 수 있음) — 그 구간의 수동
+    // 기록은 통계에서 제외해서 이중 집계를 막는다. 원본 localStorage 데이터 자체는 지우지 않는다.
+    const autoMinDate = auto.reduce((min, a) => (a.date && (!min || a.date < min)) ? a.date : min, null);
+    const manual = loadHistory()
+      .map(h => ({ ...h, source: 'manual' }))
+      .filter(h => !autoMinDate || !h.date || h.date < autoMinDate);
     return [...manual, ...auto].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   }
 
