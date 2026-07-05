@@ -414,8 +414,16 @@
     <div class="page-title">매매내역</div>
 
     <div class="section" style="padding:10px 14px;">
-      <label>예수금(원)</label>
-      <input type="number" id="capitalInput" placeholder="10000000" oninput="saveCapital()">
+      <div class="section-title">입출금 기록</div>
+      <div class="row2">
+        <div><label>날짜</label><input type="date" id="capital-date"></div>
+        <div><label>금액(원, 출금은 음수)</label><input type="number" id="capital-amount" placeholder="4000000"></div>
+      </div>
+      <div style="margin-top:8px;">
+        <label>메모 (선택)</label><input type="text" id="capital-note" placeholder="예: 초기 입금">
+      </div>
+      <button type="button" class="save-btn" style="margin-top:10px;" onclick="addCapitalEntry()">입출금 추가</button>
+      <div style="margin-top:10px;font-size:13px;color:var(--muted);" id="capital-total-display"></div>
     </div>
 
     <div class="stat-grid" id="stat-grid"></div>
@@ -470,7 +478,7 @@
   </div>
 </div>
 
-<!-- 매매내역 수정 모달 -->
+<!-- 매매내역 수정 모달 (수동 입력 카드 전용) -->
 <div class="modal-overlay" id="edit-modal">
   <div class="modal-box">
     <div class="modal-title">거래 수정</div>
@@ -481,6 +489,22 @@
     <div class="modal-actions">
       <button class="modal-cancel" onclick="closeEditModal()">취소</button>
       <button class="modal-save" onclick="saveEditedHistory()">저장하기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 자동 동기화 카드 수동 입력 모달 (자리차수/사유/규칙준수/테마/메모만 편집) -->
+<div class="modal-overlay" id="auto-edit-modal">
+  <div class="modal-box">
+    <div class="modal-title">🤖 자동 기록 — 수동 항목 입력</div>
+    <label>자리차수</label><input type="text" id="auto-edit-차수" placeholder="예: 1선">
+    <label>손절/청산 사유</label><input type="text" id="auto-edit-손절청산사유" placeholder="예: 손절 규칙 준수">
+    <label>규칙준수</label><input type="text" id="auto-edit-규칙준수" placeholder="예: O / X">
+    <label>테마</label><input type="text" id="auto-edit-테마" placeholder="예: 반도체장비">
+    <label>메모</label><input type="text" id="auto-edit-메모" placeholder="특이사항...">
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeAutoEditModal()">취소</button>
+      <button class="modal-save" onclick="saveAutoTradeManual()">저장하기</button>
     </div>
   </div>
 </div>
@@ -519,6 +543,9 @@
   let editHistId = null;     // 현재 매매내역 수정 모달에 열린 history id
   const VERDICT_LABEL = { win: '승', lose: '패' };
   let resultVerdict = null;  // 결과입력 모달에서 선택한 승/패
+  let autoTrades = [];       // 키움 자동 동기화 trades (Sheets, localStorage 아님 — 항상 최신 fetch)
+  let capitalHistory = [];   // 입출금 내역 (Sheets capital 탭)
+  let autoEditTradeId = null; // 자동 카드 수동 입력 모달에 열린 tradeId
 
   const THEME_OPTIONS = ['반도체장비','메모리반도체','AI반도체','반도체소재부품','2차전지','바이오','방산','조선','원전','로봇','소프트웨어/AI서비스','사이버보안','금융','에너지/정유','우주항공','엔터','화장품','게임','정치테마','기타(미장무관)'];
   let planThemes = []; // 계획 추가 폼에서 선택한 테마 (최대 2개)
@@ -574,7 +601,7 @@
     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
     document.getElementById('tab-' + name).classList.add('active');
     btn.classList.add('active');
-    if (name === 'history') renderHistory();
+    if (name === 'history') { loadAutoTrades(); loadCapitalHistory(); renderHistory(); }
   }
 
   /* ── 유틸 ── */
@@ -1220,16 +1247,77 @@
   function loadHistory() { return JSON.parse(localStorage.getItem('jb-history')||'[]'); }
   function saveHistory(h) { localStorage.setItem('jb-history', JSON.stringify(h)); }
   function deleteHistory(id) { saveHistory(loadHistory().filter(h=>h.id!==id)); renderHistory(); }
-  function saveCapital() {
-    localStorage.setItem('jb-capital', document.getElementById('capitalInput').value);
-    renderHistory();
+
+  // 키움 자동 동기화 데이터는 localStorage에 캐시하지 않고 매번 fetch — 항상 최신 상태 유지
+  function loadAutoTrades() {
+    fetch(`${APPS_SCRIPT_URL}?action=getTrades`)
+      .then(r => r.json())
+      .then(data => { autoTrades = data || []; renderHistory(); })
+      .catch(() => { /* 자동 동기화 실패해도 수동 내역은 정상 표시되어야 함 */ });
+  }
+
+  function loadCapitalHistory() {
+    fetch(`${APPS_SCRIPT_URL}?action=getCapital`)
+      .then(r => r.json())
+      .then(data => { capitalHistory = data || []; renderHistory(); })
+      .catch(() => {});
+  }
+
+  function addCapitalEntry() {
+    const date = document.getElementById('capital-date').value;
+    const amount = parseFloat(document.getElementById('capital-amount').value);
+    const note = document.getElementById('capital-note').value.trim();
+    if (!date || !amount) { showToast('날짜와 금액을 입력하세요.'); return; }
+    fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+      body: JSON.stringify({ type: 'saveCapital', date, amount, note })
+    })
+      .then(r => r.json())
+      .then(resp => {
+        if (resp.result !== 'OK') throw new Error(resp.result);
+        document.getElementById('capital-amount').value = '';
+        document.getElementById('capital-note').value = '';
+        showToast('✅ 입출금 기록 완료!');
+        loadCapitalHistory();
+      })
+      .catch(() => showToast('❌ 입출금 저장 실패 — 다시 시도해주세요.'));
+  }
+
+  // Sheets의 trade 객체를 기존 수동 hist-item과 같은 모양으로 정규화(렌더/통계 공용).
+  // 매도 이력이 하나도 없는(아직 매수만 한) 자동 trade는 "거래 내역"이 아니라 "보유중" 상태라
+  // 매매내역 피드에서는 제외한다(수동 기록도 매도 완료 시점에만 생기는 것과 동일한 시맨틱).
+  function normalizeAutoTrade(t) {
+    const sells = (t.sells || []).map(s => ({
+      date: s.ord_dt ? `${s.ord_dt.slice(0,4)}-${s.ord_dt.slice(4,6)}-${s.ord_dt.slice(6,8)}` : '',
+      price: s.price, qty: s.qty,
+      memo: s.tax_fee ? `세금${Math.round(s.tax_fee.tax).toLocaleString('ko-KR')} 수수료${Math.round(s.tax_fee.commission).toLocaleString('ko-KR')}` : ''
+    }));
+    const lastSell = sells[sells.length - 1];
+    const verdict = t.winLoss === '승' ? 'win' : (t.winLoss === '패' ? 'lose' : (t.totalPl >= 0 ? 'win' : 'lose'));
+    return {
+      id: t.tradeId, source: 'auto', name: t.stkNm, code: t.stkCd,
+      date: lastSell ? lastSell.date : '',
+      status: t.status === 'closed' ? (t.totalPl >= 0 ? '수익' : '손절') : '보유중(부분매도)',
+      profit: t.totalPl || 0,
+      rate: (t.totalReturnPct || 0) / 100,
+      tax: (t.sells || []).reduce((s, x) => s + (x.tax_fee ? x.tax_fee.tax : 0), 0),
+      verdict, sells, manual: t.manual || {},
+    };
+  }
+
+  function getMergedHistory() {
+    const manual = loadHistory().map(h => ({ ...h, source: 'manual' }));
+    const auto = autoTrades.filter(t => (t.sells || []).length > 0).map(normalizeAutoTrade);
+    return [...manual, ...auto].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   }
 
   function renderHistory() {
-    const capEl = document.getElementById('capitalInput');
-    if (capEl) capEl.value = localStorage.getItem('jb-capital') || '';
+    const totalCapital = capitalHistory.reduce((s, c) => s + (parseFloat(c.amount) || 0), 0);
+    const capDisplay = document.getElementById('capital-total-display');
+    if (capDisplay) capDisplay.textContent = `누적 투입원금: ${totalCapital.toLocaleString('ko-KR')}원 (입출금 ${capitalHistory.length}건)`;
 
-    const hist = loadHistory();
+    const hist = getMergedHistory();
     const grid = document.getElementById('stat-grid');
     const list = document.getElementById('hist-list');
 
@@ -1245,10 +1333,9 @@
     const losses = hist.length - wins;
     const rate  = (wins/hist.length*100).toFixed(0);
     const avgR  = (hist.reduce((s,h)=>s+h.rate,0)/hist.length*100).toFixed(2);
-    const capital = parseFloat(localStorage.getItem('jb-capital')) || 0;
-    const capRate = capital > 0 ? (total / capital * 100).toFixed(2) : null;
-    const rateLabel = capital > 0 ? '자본 기준 수익률' : '평균 수익률';
-    const rateVal = capital > 0 ? capRate : avgR;
+    const capRate = totalCapital > 0 ? (total / totalCapital * 100).toFixed(2) : null;
+    const rateLabel = totalCapital > 0 ? '자본 기준 수익률' : '평균 수익률';
+    const rateVal = totalCapital > 0 ? capRate : avgR;
 
     grid.innerHTML = `
       <div class="stat-card"><div class="stat-label">총 수익금</div><div class="stat-val ${total>=0?'green':'red'}">${total>=0?'+':''}${total.toLocaleString('ko-KR')}원</div></div>
@@ -1277,10 +1364,16 @@
         return `<div class="hist-meta">${s.date} · ${(s.price || 0).toLocaleString('ko-KR')}원 × ${s.qty}주${tag}${tierBadge}${memo}</div>`;
       }).join('');
 
+      const badge = h.source === 'auto' ? '🤖 ' : '✍️ ';
+      const actionBtns = h.source === 'manual'
+        ? `<button class="hist-edit" onclick="openEditModal(${h.id})">✎</button>
+           <button class="hist-del" onclick="deleteHistory(${h.id})">✕</button>`
+        : `<button class="hist-edit" onclick="openAutoEditModal('${h.id}')">✎</button>`;
+
       return `
       <div class="hist-item">
         <div class="hist-left">
-          <div class="hist-name">${h.name}${h.code?` <span style="font-size:11px;color:var(--muted);">${h.code}</span>`:''}</div>
+          <div class="hist-name">${badge}${h.name}${h.code?` <span style="font-size:11px;color:var(--muted);">${h.code}</span>`:''}</div>
           <div class="hist-meta">${h.date} · ${h.status}${h.sells && h.sells.length > 1 ? ` · ${h.sells.length}건 분할매도` : ''}</div>
           ${sellLines}
         </div>
@@ -1290,10 +1383,55 @@
           <div class="hist-rate">${(h.rate*100)>=0?'+':''}${(h.rate*100).toFixed(2)}%</div>
           ${h.tax > 0 ? `<div class="hist-tax">세금 -${h.tax.toLocaleString('ko-KR')}원</div>` : ''}
         </div>
-        <button class="hist-edit" onclick="openEditModal(${h.id})">✎</button>
-        <button class="hist-del" onclick="deleteHistory(${h.id})">✕</button>
+        ${actionBtns}
       </div>`;
     }).join('');
+  }
+
+  function openAutoEditModal(tradeId) {
+    const t = autoTrades.find(x => String(x.tradeId) === String(tradeId));
+    if (!t) return;
+    autoEditTradeId = tradeId;
+    const m = t.manual || {};
+    document.getElementById('auto-edit-차수').value = m.차수 || '';
+    document.getElementById('auto-edit-손절청산사유').value = m.손절청산사유 || '';
+    document.getElementById('auto-edit-규칙준수').value = m.규칙준수 || '';
+    document.getElementById('auto-edit-테마').value = m.테마 || '';
+    document.getElementById('auto-edit-메모').value = m.메모 || '';
+    document.getElementById('auto-edit-modal').classList.add('show');
+  }
+
+  function closeAutoEditModal() {
+    document.getElementById('auto-edit-modal').classList.remove('show');
+    autoEditTradeId = null;
+  }
+
+  // updateTradeManual만큼은 no-cors를 쓰지 않는다 — 응답을 읽어서 실패를 확실히 감지해야
+  // "저장한 줄 알았는데 안 들어간" 사고를 막을 수 있다(text/plain POST는 CORS simple request라
+  // no-cors 없이도 preflight 없이 전송되고, 응답도 정상적으로 읽을 수 있다).
+  function saveAutoTradeManual() {
+    if (!autoEditTradeId) return;
+    const body = {
+      type: 'updateTradeManual', tradeId: autoEditTradeId,
+      차수: document.getElementById('auto-edit-차수').value.trim(),
+      손절청산사유: document.getElementById('auto-edit-손절청산사유').value.trim(),
+      규칙준수: document.getElementById('auto-edit-규칙준수').value.trim(),
+      테마: document.getElementById('auto-edit-테마').value.trim(),
+      메모: document.getElementById('auto-edit-메모').value.trim(),
+    };
+    fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+      body: JSON.stringify(body)
+    })
+      .then(r => r.json())
+      .then(resp => {
+        if (resp.result !== 'OK') throw new Error(resp.result);
+        showToast('✅ 저장 완료!');
+        closeAutoEditModal();
+        loadAutoTrades();
+      })
+      .catch(() => showToast('❌ 저장 실패 — 네트워크를 확인하고 다시 시도해주세요.'));
   }
 
   /* ── 탭4: 시트 ── */
@@ -1310,6 +1448,8 @@
     renderThemePills();
     initPlans();
     loadPremarketCheck();
+    loadAutoTrades();
+    loadCapitalHistory();
   });
 
   // 모달 오버레이 클릭 시 닫기
@@ -1318,6 +1458,9 @@
   });
   document.getElementById('edit-modal').addEventListener('click', function(e) {
     if (e.target === this) closeEditModal();
+  });
+  document.getElementById('auto-edit-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeAutoEditModal();
   });
 </script>
 </body>
