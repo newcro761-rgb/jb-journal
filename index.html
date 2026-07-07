@@ -661,7 +661,6 @@
           themes: r[12] ? JSON.parse(r[12]) : []
         }));
         renderPlans();
-        if (autoTrades.length) renderHistory(); // plans가 autoTrades보다 늦게 로드된 경우 계획-매칭 병합을 반영해 재렌더
       })
       .catch(() => {
         plans = [];
@@ -1304,130 +1303,12 @@
       rate: (t.totalReturnPct || 0) / 100,
       tax: (t.sells || []).reduce((s, x) => s + (x.tax_fee ? x.tax_fee.tax : 0), 0),
       verdict, sells, manual: t.manual || {},
-    };
-  }
-
-  // plan.code는 자유 입력(공백/대소문자/선행 "A" 등 섞일 수 있음), t.stkCd는 trade_sync.py가
-  // 이미 "A" 접두어를 벗겨 넘기는 6자리 코드 — 방어적으로 둘 다 숫자만 남겨 6자리로 맞춘다.
-  function normalizeStockCode(code) {
-    if (!code) return '';
-    let c = String(code).trim().toUpperCase().replace(/^A/, '').replace(/[^0-9]/g, '');
-    if (c && c.length < 6) c = c.padStart(6, '0');
-    return c;
-  }
-
-  function planPriceMatches(plan, avgPrice) {
-    const TOL = 0.01;
-    const lines = [plan.b1, plan.b2].filter(v => v != null && v > 0);
-    return lines.some(line => Math.abs(avgPrice - line) <= line * TOL);
-  }
-
-  const MAX_PLAN_MATCH_BUSINESS_DAYS = 10; // 계획일~첫 매수일 사이 허용 상한 (약 2주, KRX 공휴일은 무시하는 근사치)
-
-  function businessDaysBetween(from, to) { // from <= to 가정, 당일은 0일로 카운트
-    let count = 0;
-    const cur = new Date(from);
-    while (cur.getTime() < to.getTime()) {
-      cur.setDate(cur.getDate() + 1);
-      const dow = cur.getDay();
-      if (dow !== 0 && dow !== 6) count++;
-    }
-    return count;
-  }
-
-  // "삼선" 방식(1차 매수라인 진입 → 하락 → 2차 매수라인 진입)처럼 계획 하나에서 나온 여러 번의
-  // 완결된 라운드트립이 승패 통계에서 별개 거래로 잡히는 걸 막는다 — Sheets 원본(trades/Plans)은
-  // 건드리지 않고 이 표시 계층에서만 계획의 매수라인 가격으로 매칭해 하나의 카드로 합친다.
-  function groupAutoTradesByPlan(rawAutoTrades, allPlans) {
-    const eligible = rawAutoTrades.filter(t => (t.sells || []).length > 0); // 기존 getMergedHistory 게이트와 동일
-
-    const plansByCode = {};
-    allPlans.forEach(p => {
-      const key = normalizeStockCode(p.code);
-      if (key) (plansByCode[key] = plansByCode[key] || []).push(p);
-    });
-
-    const groups = new Map();   // plan.id -> [rawTrade, ...]
-    const singles = [];
-
-    eligible.forEach(t => {
-      const firstBuy = t.buys && t.buys[0];
-      const buyIso = firstBuy && firstBuy.ord_dt
-        ? `${firstBuy.ord_dt.slice(0,4)}-${firstBuy.ord_dt.slice(4,6)}-${firstBuy.ord_dt.slice(6,8)}` : null;
-      const tradeDate = buyIso ? parsePlanDate(buyIso) : null;
-      if (!tradeDate) { singles.push(t); return; } // 날짜 파싱 실패 시 검증을 건너뛰지 않고 아예 매칭 안 함(방어적)
-
-      const candidates = plansByCode[normalizeStockCode(t.stkCd)] || [];
-      let bestPlan = null, bestDate = null;
-      candidates.forEach(p => {
-        const planDate = parsePlanDate(p.date);
-        if (!planDate) return;
-        if (planDate.getTime() > tradeDate.getTime()) return;               // 계획은 진입 이전이어야 함
-        if (businessDaysBetween(planDate, tradeDate) > MAX_PLAN_MATCH_BUSINESS_DAYS) return; // 너무 오래된 계획 배제
-        if (!planPriceMatches(p, t.avgPrice)) return;
-        if (!bestPlan || planDate.getTime() > bestDate.getTime()) {
-          bestPlan = p; bestDate = planDate;
-        }
-      });
-
-      if (bestPlan) {
-        if (!groups.has(bestPlan.id)) groups.set(bestPlan.id, []);
-        groups.get(bestPlan.id).push(t);
-      } else {
-        singles.push(t);
-      }
-    });
-
-    const result = singles.map(normalizeAutoTrade);
-    groups.forEach(members => {
-      result.push(members.length === 1 ? normalizeAutoTrade(members[0]) : mergeAutoTrades(members));
-    });
-    return result;
-  }
-
-  function mergeAutoTrades(members) {
-    const sorted = members.slice().sort((a, b) => {
-      const da = a.buys && a.buys[0] ? a.buys[0].ord_dt + (a.buys[0].ord_tm || '') : '';
-      const db = b.buys && b.buys[0] ? b.buys[0].ord_dt + (b.buys[0].ord_tm || '') : '';
-      return da.localeCompare(db);
-    });
-    const first = sorted[0];
-
-    const allSells = [];
-    sorted.forEach(t => (t.sells || []).forEach(s => allSells.push(s)));
-    allSells.sort((a, b) => `${a.ord_dt}${a.ord_tm}`.localeCompare(`${b.ord_dt}${b.ord_tm}`));
-
-    // normalizeAutoTrade의 sells 매핑과 동일 로직 재사용
-    const mappedSells = allSells.map(s => ({
-      date: s.ord_dt ? `${s.ord_dt.slice(0,4)}-${s.ord_dt.slice(4,6)}-${s.ord_dt.slice(6,8)}` : '',
-      price: s.price, qty: s.qty,
-      memo: s.tax_fee ? `세금${Math.round(s.tax_fee.tax).toLocaleString('ko-KR')} 수수료${Math.round(s.tax_fee.commission).toLocaleString('ko-KR')}` : ''
-    }));
-    const lastSell = mappedSells[mappedSells.length - 1];
-
-    const totalPl = sorted.reduce((s, t) => s + (t.totalPl || 0), 0);
-    const totalBuyValue = sorted.reduce((s, t) =>
-      s + (t.buys || []).reduce((bs, b) => bs + (b.price != null ? b.qty * b.price : 0), 0), 0);
-    const totalTax = sorted.reduce((s, t) =>
-      s + (t.sells || []).reduce((ts, x) => ts + (x.tax_fee ? x.tax_fee.tax : 0), 0), 0);
-    const allClosed = sorted.every(t => t.status === 'closed');
-
-    return {
-      id: first.tradeId, source: 'auto', name: first.stkNm, code: first.stkCd,
-      date: lastSell ? lastSell.date : '',
-      status: allClosed ? (totalPl > 0 ? '수익' : '손절') : '보유중(부분매도)',
-      profit: totalPl,
-      rate: totalBuyValue ? totalPl / totalBuyValue : 0,
-      tax: totalTax,
-      verdict: totalPl > 0 ? 'win' : 'lose',
-      sells: mappedSells,
-      manual: first.manual || {},
-      merged: true, mergedCount: sorted.length,
+      excluded: !!(t.manual && (t.manual.제외 === true || t.manual.제외 === 'true')),
     };
   }
 
   function getMergedHistory() {
-    const auto = groupAutoTradesByPlan(autoTrades, plans);
+    const auto = autoTrades.filter(t => (t.sells || []).length > 0).map(normalizeAutoTrade);
     // 자동 동기화가 커버하는 가장 이른 날짜 이후의 수동(✍️) 기록은 자동 기록과 같은 실거래를
     // 중복으로 담고 있을 가능성이 높다(백필 이전엔 손으로 기록해뒀을 수 있음) — 그 구간의 수동
     // 기록은 통계에서 제외해서 이중 집계를 막는다. 원본 localStorage 데이터 자체는 지우지 않는다.
@@ -1454,22 +1335,30 @@
       return;
     }
 
-    const total = hist.reduce((s,h)=>s+h.profit, 0);
-    const wins  = hist.filter(h => h.verdict ? h.verdict === 'win' : h.profit >= 0).length;
-    const losses = hist.length - wins;
-    const rate  = (wins/hist.length*100).toFixed(0);
-    const avgR  = (hist.reduce((s,h)=>s+h.rate,0)/hist.length*100).toFixed(2);
+    // 카드는 전부(제외 포함) 목록에 보이지만, 통계 집계에서는 사용자가 손으로 "제외" 처리한
+    // 자동(🤖) 거래를 뺀다 — 자동 매칭 대신 사용자가 직접 승패내역 포함 여부를 결정.
+    const statsHist = hist.filter(h => !h.excluded);
+    if (!statsHist.length) {
+      grid.innerHTML = '';
+      document.getElementById('summary-grid').innerHTML = '';
+    }
+
+    const total = statsHist.reduce((s,h)=>s+h.profit, 0);
+    const wins  = statsHist.filter(h => h.verdict ? h.verdict === 'win' : h.profit >= 0).length;
+    const losses = statsHist.length - wins;
+    const rate  = statsHist.length ? (wins/statsHist.length*100).toFixed(0) : '0';
+    const avgR  = statsHist.length ? (statsHist.reduce((s,h)=>s+h.rate,0)/statsHist.length*100).toFixed(2) : '0.00';
     const capRate = totalCapital > 0 ? (total / totalCapital * 100).toFixed(2) : null;
     const rateLabel = totalCapital > 0 ? '자본 기준 수익률' : '평균 수익률';
     const rateVal = totalCapital > 0 ? capRate : avgR;
 
-    grid.innerHTML = `
+    if (statsHist.length) grid.innerHTML = `
       <div class="stat-card"><div class="stat-label">총 수익금</div><div class="stat-val ${total>=0?'green':'red'}">${total>=0?'+':''}${total.toLocaleString('ko-KR')}원</div></div>
-      <div class="stat-card"><div class="stat-label">승률</div><div class="stat-val ${wins/hist.length>=0.5?'green':'red'}">${rate}%</div><div class="stat-sub">${wins}승 ${losses}패</div></div>
-      <div class="stat-card"><div class="stat-label">거래 수</div><div class="stat-val">${hist.length}건</div></div>
+      <div class="stat-card"><div class="stat-label">승률</div><div class="stat-val ${wins/statsHist.length>=0.5?'green':'red'}">${rate}%</div><div class="stat-sub">${wins}승 ${losses}패</div></div>
+      <div class="stat-card"><div class="stat-label">거래 수</div><div class="stat-val">${statsHist.length}건</div></div>
       <div class="stat-card"><div class="stat-label">${rateLabel}</div><div class="stat-val ${rateVal>=0?'green':'red'}">${rateVal>=0?'+':''}${rateVal}%</div></div>`;
 
-    document.getElementById('summary-grid').innerHTML = hist.slice(0, 9).map(h => {
+    document.getElementById('summary-grid').innerHTML = statsHist.slice(0, 9).map(h => {
       const isWin = h.verdict ? h.verdict === 'win' : h.profit >= 0;
       const rateClass = isWin ? 'green' : 'red';
       const sRate = (h.rate * 100).toFixed(2);
@@ -1495,13 +1384,21 @@
         ? `<button class="hist-edit" onclick="openEditModal(${h.id})">✎</button>
            <button class="hist-del" onclick="deleteHistory(${h.id})">✕</button>`
         : `<button class="hist-edit" onclick="openAutoEditModal('${h.id}')">✎</button>`;
+      // 자동(🤖) 거래만 승패 통계 포함 여부를 손으로 토글 — 가격/날짜 기반 자동 매칭 대신
+      // 사용자가 직접 결정(중복 라운드트립 등을 통계에서 뺄지 스스로 판단).
+      const includeToggle = h.source === 'auto'
+        ? `<label class="hist-include-toggle" title="승패 통계에 포함">
+             <input type="checkbox" ${h.excluded ? '' : 'checked'} onchange="toggleTradeIncluded('${h.id}', !this.checked)"> 통계 포함
+           </label>`
+        : '';
 
       return `
-      <div class="hist-item">
+      <div class="hist-item" ${h.excluded ? 'style="opacity:0.5;"' : ''}>
         <div class="hist-left">
-          <div class="hist-name">${badge}${h.name}${h.code?` <span style="font-size:11px;color:var(--muted);">${h.code}</span>`:''}</div>
-          <div class="hist-meta">${h.date} · ${h.status}${h.merged ? ` · ${h.mergedCount}회 진입 합산` : (h.sells && h.sells.length > 1 ? ` · ${h.sells.length}건 분할매도` : '')}</div>
+          <div class="hist-name">${badge}${h.name}${h.code?` <span style="font-size:11px;color:var(--muted);">${h.code}</span>`:''}${h.excluded ? ' <span style="color:var(--muted);font-size:11px;">(통계 제외)</span>' : ''}</div>
+          <div class="hist-meta">${h.date} · ${h.status}${h.sells && h.sells.length > 1 ? ` · ${h.sells.length}건 분할매도` : ''}</div>
           ${sellLines}
+          ${includeToggle}
         </div>
         <div class="hist-right">
           <div class="hist-verdict ${isWin?'green':'red'}">${isWin?'승':'패'}</div>
@@ -1512,6 +1409,41 @@
         ${actionBtns}
       </div>`;
     }).join('');
+  }
+
+  // 승패 통계에 이 자동(🤖) 거래를 포함할지 사용자가 직접 토글. 카드 자체는 계속 보이고
+  // (개별 거래 실체는 그대로 유지), 통계 집계(renderHistory의 statsHist)에서만 빠진다.
+  function toggleTradeIncluded(tradeId, excluded) {
+    const t = autoTrades.find(x => String(x.tradeId) === String(tradeId));
+    if (!t) return;
+    const prevManual = t.manual || {};
+    t.manual = { ...prevManual, 제외: excluded }; // 즉시 로컬 반영 → 통계 재계산
+    renderHistory();
+
+    const body = {
+      type: 'updateTradeManual', tradeId,
+      차수: prevManual.차수 || '', 손절청산사유: prevManual.손절청산사유 || '',
+      규칙준수: prevManual.규칙준수 || '', 테마: prevManual.테마 || '', 메모: prevManual.메모 || '',
+      제외: excluded,
+    };
+    fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+      body: JSON.stringify(body)
+    })
+      .then(r => r.json())
+      .then(resp => {
+        if (!resp || resp.result !== 'OK') {
+          t.manual = prevManual; // 저장 실패 시 되돌림
+          renderHistory();
+          showToast('❌ 저장 실패 — 다시 시도해주세요.');
+        }
+      })
+      .catch(() => {
+        t.manual = prevManual;
+        renderHistory();
+        showToast('❌ 저장 실패 — 다시 시도해주세요.');
+      });
   }
 
   function openAutoEditModal(tradeId) {
@@ -1537,6 +1469,8 @@
   // no-cors 없이도 preflight 없이 전송되고, 응답도 정상적으로 읽을 수 있다).
   function saveAutoTradeManual() {
     if (!autoEditTradeId) return;
+    const t = autoTrades.find(x => String(x.tradeId) === String(autoEditTradeId));
+    const prevManual = (t && t.manual) || {};
     const body = {
       type: 'updateTradeManual', tradeId: autoEditTradeId,
       차수: document.getElementById('auto-edit-차수').value.trim(),
@@ -1544,6 +1478,7 @@
       규칙준수: document.getElementById('auto-edit-규칙준수').value.trim(),
       테마: document.getElementById('auto-edit-테마').value.trim(),
       메모: document.getElementById('auto-edit-메모').value.trim(),
+      제외: prevManual.제외 === true || prevManual.제외 === 'true', // 이 모달은 통계 포함 여부를 다루지 않으므로 기존 값 유지
     };
     fetch(APPS_SCRIPT_URL, {
       method: 'POST',

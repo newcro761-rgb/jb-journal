@@ -84,7 +84,8 @@ function getTrades_(ss) {
       finalDeviationPct: r[14] || null, updatedAt: r[15],
       manual: {
         차수: r[16] || '', 손절청산사유: r[17] || '', 규칙준수: r[18] || '',
-        테마: r[19] || '', 메모: r[20] || ''
+        테마: r[19] || '', 메모: r[20] || '',
+        제외: r[21] === true || r[21] === 'true'
       }
     });
   }
@@ -143,7 +144,7 @@ function saveTrades_(ss, trades) {
       'trade_id', '종목코드', '종목명', '상태', '매수내역_json', '평균단가', '매도내역_json',
       '총실현손익', '총수익률', '승패', '보유기간일', '최종매도일_고가', '최종매도일_저가',
       '최종매도일_종가', '최종매도가_이격률', 'updated_at',
-      '자리차수', '손절청산사유', '규칙준수', '테마', '메모'
+      '자리차수', '손절청산사유', '규칙준수', '테마', '메모', '통계제외'
     ]);
     sheet.getRange('B2:B').setNumberFormat('@'); // 종목코드 — 0-패딩 숫자 문자열 자동변환 방지
   }
@@ -179,8 +180,9 @@ function updateTradeManual_(ss, data) {
   const values = sheet.getDataRange().getValues();
   for (let i = 1; i < values.length; i++) {
     if (String(values[i][0]) === String(data.tradeId)) {
-      sheet.getRange(i + 1, 17, 1, 5).setValues([[
-        data.차수 || '', data.손절청산사유 || '', data.규칙준수 || '', data.테마 || '', data.메모 || ''
+      sheet.getRange(i + 1, 17, 1, 6).setValues([[
+        data.차수 || '', data.손절청산사유 || '', data.규칙준수 || '', data.테마 || '', data.메모 || '',
+        data.제외 === true || data.제외 === 'true'
       ]]);
       return true;
     }
