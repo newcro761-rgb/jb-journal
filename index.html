@@ -577,9 +577,13 @@
   let editHistId = null;     // 현재 매매내역 수정 모달에 열린 history id
   const VERDICT_LABEL = { win: '승', lose: '패' };
   let resultVerdict = null;  // 결과입력 모달에서 선택한 승/패
-  let autoTrades = [];       // 키움 자동 동기화 trades (Sheets, localStorage 아님 — 항상 최신 fetch)
-  let capitalHistory = [];   // 입출금 내역 (Sheets capital 탭)
-  let autoEditTradeId = null; // 자동 카드 수동 입력 모달에 열린 tradeId
+  const APPS_SCRIPT_URL_GF = 'YOUR_GF_APPS_SCRIPT_URL'; // Task 4에서 배포 후 실제 URL로 교체
+  const ACCOUNTS = {
+    me: { url: APPS_SCRIPT_URL, autoTrades: [], capitalHistory: [] },
+    gf: { url: APPS_SCRIPT_URL_GF, autoTrades: [], capitalHistory: [] },
+  };
+  let autoEditAccount = null;   // 자동 카드 수동 입력 모달이 어느 계좌 것인지
+  let autoEditTradeId = null;   // 자동 카드 수동 입력 모달에 열린 tradeId
 
   const THEME_OPTIONS = ['반도체장비','메모리반도체','AI반도체','반도체소재부품','2차전지','바이오','방산','조선','원전','로봇','소프트웨어/AI서비스','사이버보안','금융','에너지/정유','우주항공','엔터','화장품','게임','정치테마','기타(미장무관)'];
   let planThemes = []; // 계획 추가 폼에서 선택한 테마 (최대 2개)
@@ -635,7 +639,10 @@
     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
     document.getElementById('tab-' + name).classList.add('active');
     btn.classList.add('active');
-    if (name === 'history') { loadAutoTrades(); loadCapitalHistory(); renderHistory(); }
+    if (name === 'history') {
+      loadAutoTrades('me'); loadCapitalHistory('me'); renderHistory('me');
+      loadAutoTrades('gf'); loadCapitalHistory('gf'); renderHistory('gf');
+    }
   }
 
   /* ── 유틸 ── */
@@ -1052,7 +1059,7 @@
 
     saveHistory(hist);
     closeEditModal();
-    renderHistory();
+    renderHistory('me');
     showToast('✅ 수정 완료!');
   }
 
@@ -1262,7 +1269,7 @@
     const btn = document.getElementById('saveBtn');
     btn.textContent = '저장 중...'; btn.disabled = true;
     fetch(APPS_SCRIPT_URL, { method:'POST', mode:'no-cors', body:JSON.stringify({row}) })
-      .then(()=>{ showToast('✅ 저장 완료!'); resetForm(); renderHistory(); })
+      .then(()=>{ showToast('✅ 저장 완료!'); resetForm(); renderHistory('me'); })
       .catch(()=>showToast('❌ 저장 실패.'))
       .finally(()=>{ btn.textContent='저장하기'; btn.disabled=false; });
   }
@@ -1280,29 +1287,34 @@
   /* ── 탭3: 매매내역 ── */
   function loadHistory() { return JSON.parse(localStorage.getItem('jb-history')||'[]'); }
   function saveHistory(h) { localStorage.setItem('jb-history', JSON.stringify(h)); }
-  function deleteHistory(id) { saveHistory(loadHistory().filter(h=>h.id!==id)); renderHistory(); }
+  function deleteHistory(id) { saveHistory(loadHistory().filter(h=>h.id!==id)); renderHistory('me'); }
 
   // 키움 자동 동기화 데이터는 localStorage에 캐시하지 않고 매번 fetch — 항상 최신 상태 유지
-  function loadAutoTrades() {
-    fetch(`${APPS_SCRIPT_URL}?action=getTrades`)
+  function loadAutoTrades(acct) {
+    const cfg = ACCOUNTS[acct];
+    if (!cfg.url || cfg.url === 'YOUR_GF_APPS_SCRIPT_URL') { renderHistory(acct); return; }
+    fetch(`${cfg.url}?action=getTrades`)
       .then(r => r.json())
-      .then(data => { autoTrades = data || []; renderHistory(); })
+      .then(data => { cfg.autoTrades = data || []; renderHistory(acct); })
       .catch(() => { /* 자동 동기화 실패해도 수동 내역은 정상 표시되어야 함 */ });
   }
 
-  function loadCapitalHistory() {
-    fetch(`${APPS_SCRIPT_URL}?action=getCapital`)
+  function loadCapitalHistory(acct) {
+    const cfg = ACCOUNTS[acct];
+    if (!cfg.url || cfg.url === 'YOUR_GF_APPS_SCRIPT_URL') { renderHistory(acct); return; }
+    fetch(`${cfg.url}?action=getCapital`)
       .then(r => r.json())
-      .then(data => { capitalHistory = data || []; renderHistory(); })
+      .then(data => { cfg.capitalHistory = data || []; renderHistory(acct); })
       .catch(() => {});
   }
 
-  function addCapitalEntry() {
-    const date = document.getElementById('capital-date').value;
-    const amount = parseFloat(document.getElementById('capital-amount').value);
-    const note = document.getElementById('capital-note').value.trim();
+  function addCapitalEntry(acct) {
+    const cfg = ACCOUNTS[acct];
+    const date = document.getElementById(`capital-date-${acct}`).value;
+    const amount = parseFloat(document.getElementById(`capital-amount-${acct}`).value);
+    const note = document.getElementById(`capital-note-${acct}`).value.trim();
     if (!date || !amount) { showToast('날짜와 금액을 입력하세요.'); return; }
-    fetch(APPS_SCRIPT_URL, {
+    fetch(cfg.url, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
       body: JSON.stringify({ type: 'saveCapital', date, amount, note })
@@ -1310,10 +1322,10 @@
       .then(r => r.json())
       .then(resp => {
         if (resp.result !== 'OK') throw new Error(resp.result);
-        document.getElementById('capital-amount').value = '';
-        document.getElementById('capital-note').value = '';
+        document.getElementById(`capital-amount-${acct}`).value = '';
+        document.getElementById(`capital-note-${acct}`).value = '';
         showToast('✅ 입출금 기록 완료!');
-        loadCapitalHistory();
+        loadCapitalHistory(acct);
       })
       .catch(() => showToast('❌ 입출금 저장 실패 — 다시 시도해주세요.'));
   }
@@ -1341,8 +1353,12 @@
     };
   }
 
-  function getMergedHistory() {
-    const auto = autoTrades.filter(t => (t.sells || []).length > 0).map(normalizeAutoTrade);
+  function getMergedHistory(acct) {
+    const cfg = ACCOUNTS[acct];
+    const auto = cfg.autoTrades.filter(t => (t.sells || []).length > 0).map(normalizeAutoTrade);
+    if (acct !== 'me') {
+      return auto.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    }
     // 자동 동기화가 커버하는 가장 이른 날짜 이후의 수동(✍️) 기록은 자동 기록과 같은 실거래를
     // 중복으로 담고 있을 가능성이 높다(백필 이전엔 손으로 기록해뒀을 수 있음) — 그 구간의 수동
     // 기록은 통계에서 제외해서 이중 집계를 막는다. 원본 localStorage 데이터 자체는 지우지 않는다.
@@ -1353,18 +1369,19 @@
     return [...manual, ...auto].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   }
 
-  function renderHistory() {
-    const totalCapital = capitalHistory.reduce((s, c) => s + (parseFloat(c.amount) || 0), 0);
-    const capDisplay = document.getElementById('capital-total-display');
-    if (capDisplay) capDisplay.textContent = `누적 투입원금: ${totalCapital.toLocaleString('ko-KR')}원 (입출금 ${capitalHistory.length}건)`;
+  function renderHistory(acct) {
+    const cfg = ACCOUNTS[acct];
+    const totalCapital = cfg.capitalHistory.reduce((s, c) => s + (parseFloat(c.amount) || 0), 0);
+    const capDisplay = document.getElementById(`capital-total-display-${acct}`);
+    if (capDisplay) capDisplay.textContent = `누적 투입원금: ${totalCapital.toLocaleString('ko-KR')}원 (입출금 ${cfg.capitalHistory.length}건)`;
 
-    const hist = getMergedHistory();
-    const grid = document.getElementById('stat-grid');
-    const list = document.getElementById('hist-list');
+    const hist = getMergedHistory(acct);
+    const grid = document.getElementById(`stat-grid-${acct}`);
+    const list = document.getElementById(`hist-list-${acct}`);
 
     if (!hist.length) {
       grid.innerHTML = '';
-      document.getElementById('summary-grid').innerHTML = '';
+      document.getElementById(`summary-grid-${acct}`).innerHTML = '';
       list.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:24px 0;">아직 기록이 없습니다.</div>';
       return;
     }
@@ -1374,7 +1391,7 @@
     const statsHist = hist.filter(h => !h.excluded);
     if (!statsHist.length) {
       grid.innerHTML = '';
-      document.getElementById('summary-grid').innerHTML = '';
+      document.getElementById(`summary-grid-${acct}`).innerHTML = '';
     }
 
     const total = statsHist.reduce((s,h)=>s+h.profit, 0);
@@ -1392,7 +1409,7 @@
       <div class="stat-card"><div class="stat-label">거래 수</div><div class="stat-val">${statsHist.length}건</div></div>
       <div class="stat-card"><div class="stat-label">${rateLabel}</div><div class="stat-val ${rateVal>=0?'green':'red'}">${rateVal>=0?'+':''}${rateVal}%</div></div>`;
 
-    document.getElementById('summary-grid').innerHTML = statsHist.slice(0, 9).map(h => {
+    document.getElementById(`summary-grid-${acct}`).innerHTML = statsHist.slice(0, 9).map(h => {
       const isWin = h.verdict ? h.verdict === 'win' : h.profit >= 0;
       const rateClass = isWin ? 'green' : 'red';
       const sRate = (h.rate * 100).toFixed(2);
@@ -1417,12 +1434,12 @@
       const actionBtns = h.source === 'manual'
         ? `<button class="hist-edit" onclick="openEditModal(${h.id})">✎</button>
            <button class="hist-del" onclick="deleteHistory(${h.id})">✕</button>`
-        : `<button class="hist-edit" onclick="openAutoEditModal('${h.id}')">✎</button>`;
+        : `<button class="hist-edit" onclick="openAutoEditModal('${acct}','${h.id}')">✎</button>`;
       // 자동(🤖) 거래만 승패 통계 포함 여부를 손으로 토글 — 가격/날짜 기반 자동 매칭 대신
       // 사용자가 직접 결정(중복 라운드트립 등을 통계에서 뺄지 스스로 판단).
       const includeToggle = h.source === 'auto'
         ? `<label class="hist-include-toggle" title="승패 통계에 포함">
-             <input type="checkbox" ${h.excluded ? '' : 'checked'} onchange="toggleTradeIncluded('${h.id}', !this.checked)"> 통계 포함
+             <input type="checkbox" ${h.excluded ? '' : 'checked'} onchange="toggleTradeIncluded('${acct}','${h.id}', !this.checked)"> 통계 포함
            </label>`
         : '';
 
@@ -1447,12 +1464,13 @@
 
   // 승패 통계에 이 자동(🤖) 거래를 포함할지 사용자가 직접 토글. 카드 자체는 계속 보이고
   // (개별 거래 실체는 그대로 유지), 통계 집계(renderHistory의 statsHist)에서만 빠진다.
-  function toggleTradeIncluded(tradeId, excluded) {
-    const t = autoTrades.find(x => String(x.tradeId) === String(tradeId));
+  function toggleTradeIncluded(acct, tradeId, excluded) {
+    const cfg = ACCOUNTS[acct];
+    const t = cfg.autoTrades.find(x => String(x.tradeId) === String(tradeId));
     if (!t) return;
     const prevManual = t.manual || {};
     t.manual = { ...prevManual, 제외: excluded }; // 즉시 로컬 반영 → 통계 재계산
-    renderHistory();
+    renderHistory(acct);
 
     const body = {
       type: 'updateTradeManual', tradeId,
@@ -1460,7 +1478,7 @@
       규칙준수: prevManual.규칙준수 || '', 테마: prevManual.테마 || '', 메모: prevManual.메모 || '',
       제외: excluded,
     };
-    fetch(APPS_SCRIPT_URL, {
+    fetch(cfg.url, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
       body: JSON.stringify(body)
@@ -1469,20 +1487,21 @@
       .then(resp => {
         if (!resp || resp.result !== 'OK') {
           t.manual = prevManual; // 저장 실패 시 되돌림
-          renderHistory();
+          renderHistory(acct);
           showToast('❌ 저장 실패 — 다시 시도해주세요.');
         }
       })
       .catch(() => {
         t.manual = prevManual;
-        renderHistory();
+        renderHistory(acct);
         showToast('❌ 저장 실패 — 다시 시도해주세요.');
       });
   }
 
-  function openAutoEditModal(tradeId) {
-    const t = autoTrades.find(x => String(x.tradeId) === String(tradeId));
+  function openAutoEditModal(acct, tradeId) {
+    const t = ACCOUNTS[acct].autoTrades.find(x => String(x.tradeId) === String(tradeId));
     if (!t) return;
+    autoEditAccount = acct;
     autoEditTradeId = tradeId;
     const m = t.manual || {};
     document.getElementById('auto-edit-차수').value = m.차수 || '';
@@ -1495,6 +1514,7 @@
 
   function closeAutoEditModal() {
     document.getElementById('auto-edit-modal').classList.remove('show');
+    autoEditAccount = null;
     autoEditTradeId = null;
   }
 
@@ -1502,8 +1522,9 @@
   // "저장한 줄 알았는데 안 들어간" 사고를 막을 수 있다(text/plain POST는 CORS simple request라
   // no-cors 없이도 preflight 없이 전송되고, 응답도 정상적으로 읽을 수 있다).
   function saveAutoTradeManual() {
-    if (!autoEditTradeId) return;
-    const t = autoTrades.find(x => String(x.tradeId) === String(autoEditTradeId));
+    if (!autoEditTradeId || !autoEditAccount) return;
+    const cfg = ACCOUNTS[autoEditAccount];
+    const t = cfg.autoTrades.find(x => String(x.tradeId) === String(autoEditTradeId));
     const prevManual = (t && t.manual) || {};
     const body = {
       type: 'updateTradeManual', tradeId: autoEditTradeId,
@@ -1514,7 +1535,7 @@
       메모: document.getElementById('auto-edit-메모').value.trim(),
       제외: prevManual.제외 === true || prevManual.제외 === 'true', // 이 모달은 통계 포함 여부를 다루지 않으므로 기존 값 유지
     };
-    fetch(APPS_SCRIPT_URL, {
+    fetch(cfg.url, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
       body: JSON.stringify(body)
@@ -1523,8 +1544,9 @@
       .then(resp => {
         if (resp.result !== 'OK') throw new Error(resp.result);
         showToast('✅ 저장 완료!');
+        const acct = autoEditAccount;
         closeAutoEditModal();
-        loadAutoTrades();
+        loadAutoTrades(acct);
       })
       .catch(() => showToast('❌ 저장 실패 — 네트워크를 확인하고 다시 시도해주세요.'));
   }
@@ -1543,8 +1565,10 @@
     renderThemePills();
     initPlans();
     loadPremarketCheck();
-    loadAutoTrades();
-    loadCapitalHistory();
+    loadAutoTrades('me');
+    loadCapitalHistory('me');
+    loadAutoTrades('gf');
+    loadCapitalHistory('gf');
   });
 
   // 모달 오버레이 클릭 시 닫기
