@@ -143,6 +143,13 @@
     .modal-cancel { flex: 1; padding: 14px; background: var(--input-bg); border: 1px solid var(--border); color: var(--muted); border-radius: 10px; font-size: 15px; cursor: pointer; }
     .modal-save { flex: 2; padding: 14px; background: var(--accent); border: none; color: white; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; }
 
+    /* 매매내역 탭 — 2단 컬럼 */
+    .hist-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+    .hist-column-label { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 8px; padding: 0 2px; }
+    @media (max-width: 640px) {
+      .hist-columns { grid-template-columns: 1fr; }
+    }
+
     /* 매매내역 탭 */
     .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
     .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -413,29 +420,56 @@
   <div id="tab-history" class="tab-content">
     <div class="page-title">매매내역</div>
 
-    <div class="section" style="padding:10px 14px;">
-      <div class="section-title">입출금 기록</div>
-      <div class="row2">
-        <div><label>날짜</label><input type="date" id="capital-date"></div>
-        <div><label>금액(원, 출금은 음수)</label><input type="number" id="capital-amount" placeholder="4000000"></div>
+    <div class="hist-columns">
+      <div>
+        <div class="hist-column-label">내 계좌</div>
+        <div class="section" style="padding:10px 14px;">
+          <div class="section-title">입출금 기록</div>
+          <div class="row2">
+            <div><label>날짜</label><input type="date" id="capital-date-me"></div>
+            <div><label>금액(원, 출금은 음수)</label><input type="number" id="capital-amount-me" placeholder="4000000"></div>
+          </div>
+          <div style="margin-top:8px;">
+            <label>메모 (선택)</label><input type="text" id="capital-note-me" placeholder="예: 초기 입금">
+          </div>
+          <button type="button" class="save-btn" style="margin-top:10px;" onclick="addCapitalEntry('me')">입출금 추가</button>
+          <div style="margin-top:10px;font-size:13px;color:var(--muted);" id="capital-total-display-me"></div>
+        </div>
+        <div class="stat-grid" id="stat-grid-me"></div>
+        <div class="section" style="padding:10px 14px;">
+          <div class="section-title">최근 9건 요약</div>
+          <div class="summary-grid" id="summary-grid-me"></div>
+        </div>
+        <div class="section" style="padding:10px 14px;">
+          <div class="section-title">최근 거래</div>
+          <div id="hist-list-me"></div>
+        </div>
       </div>
-      <div style="margin-top:8px;">
-        <label>메모 (선택)</label><input type="text" id="capital-note" placeholder="예: 초기 입금">
+
+      <div>
+        <div class="hist-column-label">여자친구 계좌</div>
+        <div class="section" style="padding:10px 14px;">
+          <div class="section-title">입출금 기록</div>
+          <div class="row2">
+            <div><label>날짜</label><input type="date" id="capital-date-gf"></div>
+            <div><label>금액(원, 출금은 음수)</label><input type="number" id="capital-amount-gf" placeholder="4000000"></div>
+          </div>
+          <div style="margin-top:8px;">
+            <label>메모 (선택)</label><input type="text" id="capital-note-gf" placeholder="예: 초기 입금">
+          </div>
+          <button type="button" class="save-btn" style="margin-top:10px;" onclick="addCapitalEntry('gf')">입출금 추가</button>
+          <div style="margin-top:10px;font-size:13px;color:var(--muted);" id="capital-total-display-gf"></div>
+        </div>
+        <div class="stat-grid" id="stat-grid-gf"></div>
+        <div class="section" style="padding:10px 14px;">
+          <div class="section-title">최근 9건 요약</div>
+          <div class="summary-grid" id="summary-grid-gf"></div>
+        </div>
+        <div class="section" style="padding:10px 14px;">
+          <div class="section-title">최근 거래</div>
+          <div id="hist-list-gf"></div>
+        </div>
       </div>
-      <button type="button" class="save-btn" style="margin-top:10px;" onclick="addCapitalEntry()">입출금 추가</button>
-      <div style="margin-top:10px;font-size:13px;color:var(--muted);" id="capital-total-display"></div>
-    </div>
-
-    <div class="stat-grid" id="stat-grid"></div>
-
-    <div class="section" style="padding:10px 14px;">
-      <div class="section-title">최근 9건 요약</div>
-      <div class="summary-grid" id="summary-grid"></div>
-    </div>
-
-    <div class="section" style="padding:10px 14px;">
-      <div class="section-title">최근 거래</div>
-      <div id="hist-list"></div>
     </div>
   </div>
 
