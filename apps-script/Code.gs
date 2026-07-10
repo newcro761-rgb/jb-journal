@@ -190,6 +190,39 @@ function updateTradeManual_(ss, data) {
   return false;
 }
 
+function deleteTradeRows_(ss, tradeIds) {
+  // 중복행 정리용 — 정확히 일치하는 tradeId 행만 trades 시트에서 삭제한다. fills 시트는 건드리지
+  // 않는다(fills는 ordNo|cntrDt|price|qty 멱등성 가드가 이미 있어 진짜 중복이 아니고, trade
+  // 요약 재계산에 필요한 원본 체결 이력이라 보존).
+  const sheet = ss.getSheetByName('trades');
+  if (!sheet) return 0;
+  const idSet = {};
+  (tradeIds || []).forEach(function (id) { idSet[String(id)] = true; });
+  const values = sheet.getDataRange().getValues();
+  let deleted = 0;
+  for (let i = values.length - 1; i >= 1; i--) {
+    if (idSet[String(values[i][0])]) {
+      sheet.deleteRow(i + 1);
+      deleted++;
+    }
+  }
+  return deleted;
+}
+
+function clearTradeData_(ss, confirm) {
+  // 계좌 재백필 전 초기화용 — trades/fills 시트의 데이터 행을 전부 지운다(헤더는 유지).
+  // capital(입출금) 시트는 건드리지 않는다. 되돌릴 수 없으므로 confirm 토큰이 정확히 일치할
+  // 때만 실행한다.
+  if (confirm !== 'CLEAR_TRADE_DATA') return { result: 'CONFIRM_MISMATCH' };
+  ['trades', 'fills'].forEach(function (name) {
+    const sheet = ss.getSheetByName(name);
+    if (!sheet) return;
+    const lastRow = sheet.getLastRow();
+    if (lastRow > 1) sheet.deleteRows(2, lastRow - 1);
+  });
+  return { result: 'OK' };
+}
+
 function saveCapital_(ss, data) {
   let sheet = ss.getSheetByName('capital');
   if (!sheet) {
@@ -219,6 +252,18 @@ function doPost(e) {
   if (data.type === 'updateTradeManual') {
     const found = updateTradeManual_(ss, data);
     return ContentService.createTextOutput(JSON.stringify({result: found ? 'OK' : 'NOT_FOUND'}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (data.type === 'deleteTradeRows') {
+    const deleted = deleteTradeRows_(ss, data.tradeIds);
+    return ContentService.createTextOutput(JSON.stringify({result:'OK', deleted: deleted}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (data.type === 'clearTradeData') {
+    const res = clearTradeData_(ss, data.confirm);
+    return ContentService.createTextOutput(JSON.stringify(res))
       .setMimeType(ContentService.MimeType.JSON);
   }
 
