@@ -190,6 +190,14 @@ function updateTradeManual_(ss, data) {
   return false;
 }
 
+function backupSpreadsheet_(ss) {
+  // 되돌릴 수 없는 정리 작업(deleteTradeRows/clearTradeData) 전에 호출 — 현재 스프레드시트
+  // 전체를 Drive에 사본으로 복제한다(같은 폴더). 사본 URL을 응답으로 돌려준다.
+  const now = Utilities.formatDate(new Date(), ss.getSpreadsheetTimeZone(), 'yyyyMMdd-HHmmss');
+  const copy = ss.copy(ss.getName() + ' backup-' + now);
+  return { result: 'OK', url: copy.getUrl(), name: copy.getName() };
+}
+
 function deleteTradeRows_(ss, tradeIds) {
   // 중복행 정리용 — 정확히 일치하는 tradeId 행만 trades 시트에서 삭제한다. fills 시트는 건드리지
   // 않는다(fills는 ordNo|cntrDt|price|qty 멱등성 가드가 이미 있어 진짜 중복이 아니고, trade
@@ -252,6 +260,12 @@ function doPost(e) {
   if (data.type === 'updateTradeManual') {
     const found = updateTradeManual_(ss, data);
     return ContentService.createTextOutput(JSON.stringify({result: found ? 'OK' : 'NOT_FOUND'}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (data.type === 'backupSpreadsheet') {
+    const res = backupSpreadsheet_(ss);
+    return ContentService.createTextOutput(JSON.stringify(res))
       .setMimeType(ContentService.MimeType.JSON);
   }
 
