@@ -477,6 +477,15 @@
       <div style="font-size:12px;color:var(--text);word-break:break-all;line-height:1.4;" id="sheets-url-display">—</div>
     </div>
   </div>
+
+  <!-- ======== 탭5: 오늘의 테마 ======== -->
+  <div id="tab-theme" class="tab-content">
+    <div class="page-title">🔥 오늘의 테마</div>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:8px;">
+      8%+ 급등 종목을 매일 장마감 후 AI가 테마별로 자동 그룹핑합니다.
+    </p>
+    <div id="theme-list"></div>
+  </div>
 </div>
 
 <!-- 결과 입력 모달 -->
@@ -549,6 +558,9 @@
   </button>
   <button class="tab-btn" onclick="switchTab('sheets',this)">
     <span class="icon">🗂️</span><span>시트</span>
+  </button>
+  <button class="tab-btn" onclick="switchTab('theme',this)">
+    <span class="icon">🔥</span><span>테마</span>
   </button>
 </nav>
 
@@ -634,6 +646,45 @@
     btn.classList.add('active');
     if (name === 'history-me') { loadAutoTrades('me'); loadCapitalHistory('me'); renderHistory('me'); }
     if (name === 'history-gf') { loadAutoTrades('gf'); loadCapitalHistory('gf'); renderHistory('gf'); }
+    if (name === 'theme') { loadThemeHistory(); }
+  }
+
+  /* ── 오늘의 테마 ── */
+  let themeHistoryLoaded = false;
+  function loadThemeHistory(force) {
+    if (themeHistoryLoaded && !force) return;
+    const list = document.getElementById('theme-list');
+    list.innerHTML = '<p style="color:var(--muted);">불러오는 중...</p>';
+    fetch(`${APPS_SCRIPT_URL}?action=getThemeHistory&limit=14`)
+      .then(r => r.json())
+      .then(days => {
+        themeHistoryLoaded = true;
+        list.innerHTML = days.length
+          ? days.map(renderThemeDay).join('')
+          : '<p style="color:var(--muted);">데이터 없음</p>';
+      })
+      .catch(() => { list.innerHTML = '<p style="color:var(--muted);">불러오기 실패</p>'; });
+  }
+
+  function renderThemeDay(day) {
+    const dm = (day.date || '').match(/^\d{4}-(\d{2})-(\d{2})/);
+    const dateLabel = dm ? `${Number(dm[1])}/${Number(dm[2])}` : day.date;
+    const groupsHtml = (day.groups || []).map(g => `
+      <div style="margin:10px 0;">
+        <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:4px;">
+          ${g.theme} (${(g.stocks || []).length})
+        </div>
+        ${(g.stocks || []).map(s => `
+          <div style="display:flex;justify-content:space-between;gap:8px;font-size:13px;padding:4px 0;border-bottom:1px solid var(--border);">
+            <span>${s.name} <span style="color:var(--muted);font-size:11px;">${s.rate != null ? (s.rate >= 0 ? '+' : '') + s.rate.toFixed(1) + '%' : ''}</span></span>
+            <span style="color:var(--muted);font-size:12px;text-align:right;">${s.memo || ''}</span>
+          </div>`).join('')}
+      </div>`).join('');
+    return `
+      <div class="section" style="padding:12px 14px;margin-bottom:12px;">
+        <div class="section-title">${dateLabel} · 종목 ${day.stockCount || 0}개</div>
+        ${groupsHtml || '<p style="color:var(--muted);font-size:13px;">테마 없음</p>'}
+      </div>`;
   }
 
   /* ── 유틸 ── */

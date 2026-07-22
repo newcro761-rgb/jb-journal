@@ -14,6 +14,9 @@ function doGet(e) {
   if (action === 'getCapital') {
     return getCapital_(ss);
   }
+  if (action === 'getThemeHistory') {
+    return getThemeHistory_(ss, e.parameter.date, e.parameter.limit);
+  }
 
   const sheet = ss.getSheetByName('Plans');
   if (!sheet) return ContentService.createTextOutput(JSON.stringify([])).setMimeType(ContentService.MimeType.JSON);
@@ -62,6 +65,27 @@ function getPremarketCheck_(ss, dateStr) {
     }
   }
   return ContentService.createTextOutput('null').setMimeType(ContentService.MimeType.JSON);
+}
+
+// ---- 오늘의 테마 (theme_daily.py, GitHub Actions 자동 실행) ----
+
+function getThemeHistory_(ss, dateStr, limitStr) {
+  const sheet = ss.getSheetByName('theme_daily');
+  if (!sheet) return ContentService.createTextOutput(JSON.stringify([])).setMimeType(ContentService.MimeType.JSON);
+  const values = sheet.getDataRange().getValues();
+  const out = [];
+  const limit = limitStr ? Number(limitStr) : null;
+  for (let i = values.length - 1; i >= 1; i--) {
+    const r = values[i];
+    if (!r[0]) continue;
+    const d = normalizeDateStr_(r[0]);
+    if (dateStr && d !== dateStr) continue;
+    let parsed;
+    try { parsed = JSON.parse(r[4]); } catch (e2) { continue; }
+    out.push({ date: d, generatedAt: r[1], model: r[2], stockCount: r[3], groups: parsed.groups || [] });
+    if (!dateStr && limit && out.length >= limit) break;
+  }
+  return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
 }
 
 // ---- 키움 자동 매매일지 동기화 (읽기 전용 조회 데이터만 기록 — 주문 관련 아님) ----
@@ -241,6 +265,24 @@ function saveCapital_(ss, data) {
   sheet.appendRow([data.date, data.amount, data.note || '']);
 }
 
+function saveThemeDaily_(ss, data) {
+  // 같은 날짜 재실행(workflow_dispatch 재트리거 등) 시 중복 행 대신 덮어쓴다.
+  let sheet = ss.getSheetByName('theme_daily');
+  if (!sheet) {
+    sheet = ss.insertSheet('theme_daily');
+    sheet.appendRow(['date', 'generatedAt', 'model', 'stockCount', 'raw_json']);
+  }
+  const values = sheet.getDataRange().getValues();
+  const row = [data.date, data.generatedAt || '', data.model || '', data.stockCount || 0, JSON.stringify(data)];
+  for (let i = 1; i < values.length; i++) {
+    if (normalizeDateStr_(values[i][0]) === data.date) {
+      sheet.getRange(i + 1, 1, 1, 5).setValues([row]);
+      return;
+    }
+  }
+  sheet.appendRow(row);
+}
+
 function doPost(e) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const data = JSON.parse(e.postData.contents);
@@ -336,6 +378,12 @@ function doPost(e) {
         break;
       }
     }
+    return ContentService.createTextOutput(JSON.stringify({result:'OK'}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (data.type === 'theme-save') {
+    saveThemeDaily_(ss, data);
     return ContentService.createTextOutput(JSON.stringify({result:'OK'}))
       .setMimeType(ContentService.MimeType.JSON);
   }

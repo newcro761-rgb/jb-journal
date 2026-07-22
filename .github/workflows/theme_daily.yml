@@ -1,0 +1,26 @@
+name: Theme Daily Grouping
+
+on:
+  schedule:
+    # UTC 10:30 = KST 19:30, 평일 장마감+정산 이후. GitHub 무료 크론은 부하 시
+    # 지연될 수 있지만 저널 용도상 문제없고, workflow_dispatch로 수동 재실행 가능.
+    - cron: '30 10 * * 1-5'
+  workflow_dispatch: {}
+
+jobs:
+  theme:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      # FinanceDataReader 버전 핀 고정 — 컬럼명(ChagesRatio/Amount/Marcap)이
+      # 버전마다 바뀐 이력이 있어 자동 업그레이드 시 조용히 깨질 수 있음.
+      - run: pip install FinanceDataReader==0.9.202 requests beautifulsoup4 anthropic pandas
+      - run: python scripts/theme_daily.py
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
