@@ -17,7 +17,7 @@ jobs:
           python-version: '3.11'
       # FinanceDataReader 버전 핀 고정 — 컬럼명(ChagesRatio/Amount/Marcap)이
       # 버전마다 바뀐 이력이 있어 자동 업그레이드 시 조용히 깨질 수 있음.
-      - run: pip install FinanceDataReader==0.9.202 requests beautifulsoup4 anthropic pandas
+      - run: pip install finance-datareader==0.9.202 requests beautifulsoup4 anthropic pandas yfinance
       - run: python scripts/theme_daily.py
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
