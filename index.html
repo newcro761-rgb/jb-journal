@@ -660,15 +660,18 @@
       .then(days => {
         themeHistoryLoaded = true;
         list.innerHTML = days.length
-          ? days.map(renderThemeDay).join('')
+          ? days.map((d, i) => renderThemeDay(d, i === 0)).join('')
           : '<p style="color:var(--muted);">데이터 없음</p>';
       })
       .catch(() => { list.innerHTML = '<p style="color:var(--muted);">불러오기 실패</p>'; });
   }
 
-  function renderThemeDay(day) {
+  // 최신 날짜(idx 0)만 기본 펼침, 나머지는 접힌 요약 줄로 시작 — 날짜가 쌓여도 한 화면이 끝없이
+  // 길어지지 않게. 헤더 클릭으로 개별 토글.
+  function renderThemeDay(day, expanded) {
     const dm = (day.date || '').match(/^\d{4}-(\d{2})-(\d{2})/);
     const dateLabel = dm ? `${Number(dm[1])}/${Number(dm[2])}` : day.date;
+    const themeCount = (day.groups || []).length;
     const groupsHtml = (day.groups || []).map(g => `
       <div style="margin:10px 0;">
         <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:4px;">
@@ -679,12 +682,25 @@
             <span>${s.name} <span style="color:var(--muted);font-size:11px;">${s.rate != null ? (s.rate >= 0 ? '+' : '') + s.rate.toFixed(1) + '%' : ''}</span></span>
             <span style="color:var(--muted);font-size:12px;text-align:right;">${s.memo || ''}</span>
           </div>`).join('')}
-      </div>`).join('');
+      </div>`).join('') || '<p style="color:var(--muted);font-size:13px;">테마 없음</p>';
     return `
       <div class="section" style="padding:12px 14px;margin-bottom:12px;">
-        <div class="section-title">${dateLabel} · 종목 ${day.stockCount || 0}개</div>
-        ${groupsHtml || '<p style="color:var(--muted);font-size:13px;">테마 없음</p>'}
+        <div class="section-title" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;" onclick="toggleThemeDay(this)">
+          <span>${dateLabel} · 테마 ${themeCount}개 · 종목 ${day.stockCount || 0}개</span>
+          <span>${expanded ? '▲' : '▼'}</span>
+        </div>
+        <div style="${expanded ? '' : 'display:none;'}">
+          ${groupsHtml}
+        </div>
       </div>`;
+  }
+
+  function toggleThemeDay(header) {
+    const body = header.nextElementSibling;
+    const arrow = header.lastElementChild;
+    const hidden = body.style.display === 'none';
+    body.style.display = hidden ? '' : 'none';
+    arrow.textContent = hidden ? '▲' : '▼';
   }
 
   /* ── 유틸 ── */
