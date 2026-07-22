@@ -484,6 +484,14 @@
     <p style="color:var(--muted);font-size:13px;margin-bottom:8px;">
       8%+ 급등 종목을 매일 장마감 후 AI가 테마별로 자동 그룹핑합니다.
     </p>
+    <div class="section" style="padding:12px 14px;margin-bottom:12px;">
+      <div class="section-title">일별 급등종목 수 추이</div>
+      <div id="theme-trend-chart" style="display:flex;align-items:flex-end;gap:2px;height:110px;padding-top:18px;"></div>
+    </div>
+    <div class="section" style="padding:12px 14px;margin-bottom:12px;">
+      <div class="section-title">자주 등장한 테마 TOP 6</div>
+      <div id="theme-top-chart"></div>
+    </div>
     <div id="theme-list"></div>
   </div>
 </div>
@@ -659,6 +667,8 @@
       .then(r => r.json())
       .then(days => {
         themeHistoryLoaded = true;
+        renderThemeTrend(days);
+        renderThemeTop(days);
         list.innerHTML = days.length
           ? days.map((d, i) => renderThemeDay(d, i === 0)).join('')
           : '<p style="color:var(--muted);">데이터 없음</p>';
@@ -666,27 +676,91 @@
       .catch(() => { list.innerHTML = '<p style="color:var(--muted);">불러오기 실패</p>'; });
   }
 
+  // 테마명/종목명/메모는 전부 외부 데이터(Claude 생성 텍스트, 뉴스 헤드라인 영향)라
+  // innerHTML에 꽂기 전 반드시 이스케이프한다 — XSS 방지.
+  function escapeHtml(str) {
+    return String(str ?? '').replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+  }
+
+  function themeDateLabel(dateStr) {
+    const dm = (dateStr || '').match(/^\d{4}-(\d{2})-(\d{2})/);
+    return dm ? `${Number(dm[1])}/${Number(dm[2])}` : (dateStr || '');
+  }
+
+  // 일별 급등종목 수 추이 — 단일 지표(크기 비교) 막대그래프, 색은 accent 하나만 씀
+  // (테마명은 매일 자유 텍스트라 개수가 안 정해져 있어 카테고리별 고정 색상 배정이 불가능함).
+  function renderThemeTrend(days) {
+    const el = document.getElementById('theme-trend-chart');
+    if (!days.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px;">데이터 없음</p>'; return; }
+    const ordered = [...days].reverse(); // 과거→최신 순으로 왼쪽부터
+    const maxCount = Math.max(1, ...ordered.map(d => d.stockCount || 0));
+    el.innerHTML = ordered.map((d, i) => {
+      const dateLabel = themeDateLabel(d.date);
+      const count = d.stockCount || 0;
+      const barPx = count > 0 ? Math.max(4, Math.round((count / maxCount) * 70)) : 2;
+      return `
+        <div style="display:flex;flex-direction:column;align-items:center;flex:1;min-width:0;">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:2px;">${count || ''}</div>
+          <div class="theme-trend-bar" data-idx="${i}" style="width:100%;max-width:22px;height:${barPx}px;background:var(--accent);border-radius:4px 4px 0 0;cursor:pointer;"></div>
+          <div style="font-size:9px;color:var(--muted);margin-top:4px;white-space:nowrap;">${escapeHtml(dateLabel)}</div>
+        </div>`;
+    }).join('');
+    el.querySelectorAll('.theme-trend-bar').forEach(bar => {
+      const d = ordered[Number(bar.dataset.idx)];
+      bar.addEventListener('click', () => showToast(`${themeDateLabel(d.date)}: ${d.stockCount || 0}종목`));
+    });
+  }
+
+  // 자주 등장한 테마 TOP — 최근 기간 동안 테마별 누적 종목수로 랭킹(같은 표현끼리만 합산되므로
+  // Claude가 그날그날 살짝 다르게 표현하면 별도 항목으로 잡힐 수 있음 — 참고용 랭킹).
+  function renderThemeTop(days) {
+    const el = document.getElementById('theme-top-chart');
+    const counts = {};
+    days.forEach(d => (d.groups || []).forEach(g => {
+      const key = (g.theme || '').trim();
+      if (!key) return;
+      counts[key] = (counts[key] || 0) + (g.stocks || []).length;
+    }));
+    const ranked = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    if (!ranked.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px;">데이터 없음</p>'; return; }
+    const maxVal = ranked[0][1];
+    el.innerHTML = ranked.map(([theme, val], i) => `
+      <div style="margin:8px 0;">
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text);margin-bottom:3px;">
+          <span>${escapeHtml(theme)}</span><span style="color:var(--muted);">${val}</span>
+        </div>
+        <div style="height:10px;background:var(--border);border-radius:4px;overflow:hidden;">
+          <div class="theme-top-bar" data-idx="${i}" style="height:100%;width:${Math.max(6, Math.round(val / maxVal * 100))}%;background:var(--accent);border-radius:4px;cursor:pointer;"></div>
+        </div>
+      </div>`).join('');
+    el.querySelectorAll('.theme-top-bar').forEach(bar => {
+      const [theme, val] = ranked[Number(bar.dataset.idx)];
+      bar.addEventListener('click', () => showToast(`${theme}: 최근 ${val}건`));
+    });
+  }
+
   // 최신 날짜(idx 0)만 기본 펼침, 나머지는 접힌 요약 줄로 시작 — 날짜가 쌓여도 한 화면이 끝없이
   // 길어지지 않게. 헤더 클릭으로 개별 토글.
   function renderThemeDay(day, expanded) {
-    const dm = (day.date || '').match(/^\d{4}-(\d{2})-(\d{2})/);
-    const dateLabel = dm ? `${Number(dm[1])}/${Number(dm[2])}` : day.date;
+    const dateLabel = themeDateLabel(day.date);
     const themeCount = (day.groups || []).length;
     const groupsHtml = (day.groups || []).map(g => `
       <div style="margin:10px 0;">
         <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:4px;">
-          ${g.theme} (${(g.stocks || []).length})
+          ${escapeHtml(g.theme)} (${(g.stocks || []).length})
         </div>
         ${(g.stocks || []).map(s => `
           <div style="display:flex;justify-content:space-between;gap:8px;font-size:13px;padding:4px 0;border-bottom:1px solid var(--border);">
-            <span>${s.name} <span style="color:var(--muted);font-size:11px;">${s.rate != null ? (s.rate >= 0 ? '+' : '') + s.rate.toFixed(1) + '%' : ''}</span></span>
-            <span style="color:var(--muted);font-size:12px;text-align:right;">${s.memo || ''}</span>
+            <span>${escapeHtml(s.name)} <span style="color:var(--muted);font-size:11px;">${s.rate != null ? (s.rate >= 0 ? '+' : '') + s.rate.toFixed(1) + '%' : ''}</span></span>
+            <span style="color:var(--muted);font-size:12px;text-align:right;">${escapeHtml(s.memo)}</span>
           </div>`).join('')}
       </div>`).join('') || '<p style="color:var(--muted);font-size:13px;">테마 없음</p>';
     return `
       <div class="section" style="padding:12px 14px;margin-bottom:12px;">
         <div class="section-title" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;" onclick="toggleThemeDay(this)">
-          <span>${dateLabel} · 테마 ${themeCount}개 · 종목 ${day.stockCount || 0}개</span>
+          <span>${escapeHtml(dateLabel)} · 테마 ${themeCount}개 · 종목 ${day.stockCount || 0}개</span>
           <span>${expanded ? '▲' : '▼'}</span>
         </div>
         <div style="${expanded ? '' : 'display:none;'}">

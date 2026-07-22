@@ -27,6 +27,7 @@ from premarket_check import KST, is_kr_market_holiday, kst_now
 
 BULL_RATE_THRESHOLD_PCT = 8.0
 MIN_PRICE = 1_000
+MIN_AMOUNT_EOK = 50  # 거래대금 50억 미만 초소형주는 노이즈로 보고 제외 (사용자 확인 후 조정)
 NEWS_PER_STOCK = 5
 NEWS_WORKERS = 10
 MODEL = "claude-sonnet-5"
@@ -87,12 +88,14 @@ def build_blacklist():
 
 
 def find_theme_candidates(universe, blacklist):
-    """스크린샷의 실제 습관대로 거래대금/시가총액 하한선 없이 8%+ 양봉 전부를 담는다
-    (기존 상승장(0186) 로직의 2000억 하한선과는 다른 조건)."""
+    """8%+ 양봉 종목 중 거래대금 MIN_AMOUNT_EOK 이상만 담는다 — 기존 상승장(0186) 로직의
+    2000억 하한선보다는 훨씬 낮지만(스크린샷처럼 중소형주도 포함하려는 의도), 거래대금
+    1억 미만 초소형주까지 매일 노이즈로 섞이는 건 사용자 확인 후 제외하기로 함."""
     u = universe[
         (universe['ChagesRatio'] >= BULL_RATE_THRESHOLD_PCT)
         & (universe['Close'] > universe['Open'])
         & (universe['Close'] >= MIN_PRICE)
+        & (universe['Amount'] >= MIN_AMOUNT_EOK * 1e8)
         & (~universe['Code'].isin(blacklist))
     ]
     rows = [{
