@@ -658,12 +658,12 @@
     fetch(`${APPS_SCRIPT_URL}?action=classifyTheme&name=${encodeURIComponent(name)}&code=${encodeURIComponent(code)}`)
       .then(r => r.json())
       .then(result => {
-        if (statusEl) statusEl.textContent = '';
-        if (planThemes.length > 0) return; // 응답 오는 사이 사용자가 수동 선택했으면 무시
+        if (planThemes.length > 0) { if (statusEl) statusEl.textContent = ''; return; } // 응답 오는 사이 사용자가 수동 선택했으면 무시
         (result.themes || []).forEach(theme => {
           const el = document.querySelector(`#p-theme-pills .pill[data-theme="${theme}"]`);
           if (el && planThemes.indexOf(theme) < 0) togglePlanTheme(theme, el);
         });
+        if (statusEl) statusEl.textContent = result.detail ? `— ${result.detail}` : '';
       })
       .catch(err => { if (statusEl) statusEl.textContent = ''; console.warn('테마 자동분류 실패', err); });
   }
@@ -887,6 +887,8 @@
     planThemes = [];
     lastClassifiedCode = null;
     document.querySelectorAll('#p-theme-pills .pill').forEach(el => el.classList.remove('active'));
+    const themeStatusEl = document.getElementById('p-theme-ai-status');
+    if (themeStatusEl) themeStatusEl.textContent = '';
     p2manual = false;
     fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ type: 'plan-save', plan }) });
     switchSubTab('wait');

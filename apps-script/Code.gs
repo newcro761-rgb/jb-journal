@@ -111,7 +111,9 @@ function classifyTheme_(name, code) {
       system: '너는 한국 주식 종목을 아래 20개 테마 카테고리 중 최대 2개로 분류하는 도우미다. ' +
         '테마 목록: ' + THEME_OPTIONS_.join(', ') + '. ' +
         '주어진 종목명/종목코드를 보고 가장 관련 있는 테마를 관련도 순으로 최대 2개 골라라. ' +
-        '뚜렷하게 관련된 테마가 없으면 빈 배열을 반환해라. 반드시 위 목록에 있는 테마명만 그대로 사용해라.',
+        '뚜렷하게 관련된 테마가 없으면 빈 배열을 반환해라. 반드시 위 목록에 있는 테마명만 그대로 사용해라. ' +
+        '추가로, 왜 그 테마인지를 세분화해서 설명하는 아주 짧은 문구(15자 이내, 예: "정유 마진 확대", "HBM 후공정 장비")를 detail에 담아라. ' +
+        '분류된 테마가 없으면 detail도 빈 문자열로 반환해라.',
       messages: [
         { role: 'user', content: '종목명: ' + name + ', 종목코드: ' + code }
       ],
@@ -124,9 +126,10 @@ function classifyTheme_(name, code) {
               themes: {
                 type: 'array',
                 items: { type: 'string', enum: THEME_OPTIONS_ }
-              }
+              },
+              detail: { type: 'string' }
             },
-            required: ['themes'],
+            required: ['themes', 'detail'],
             additionalProperties: false
           }
         }
@@ -149,7 +152,7 @@ function classifyTheme_(name, code) {
       return ContentService.createTextOutput(JSON.stringify({ themes: [], error: 'no_text_block' })).setMimeType(ContentService.MimeType.JSON);
     }
     var parsed = JSON.parse(textBlock.text);
-    return ContentService.createTextOutput(JSON.stringify({ themes: (parsed.themes || []).slice(0, 2) })).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({ themes: (parsed.themes || []).slice(0, 2), detail: parsed.detail || '' })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({ themes: [], error: String(err) })).setMimeType(ContentService.MimeType.JSON);
   }
