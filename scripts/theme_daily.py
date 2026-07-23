@@ -183,6 +183,10 @@ SYSTEM_PROMPT = """당신은 한국 주식시장 테마주 분석가입니다.
 - memo는 종목명을 반복하지 말고 급등 근거를 15자 내외로 압축하세요."""
 
 
+CLASSIFY_BATCH_SIZE = 40  # 배치당 출력이 첫 시도(max_tokens=8000) 안에 들어오도록 하는 상한
+CLASSIFY_WORKERS = 8
+
+
 def classify_themes(candidates_with_news, client, max_tokens=8000, _retried=False):
     user_payload = json.dumps([
         {"code": c["code"], "name": c["name"], "rate": c["rate"], "headlines": c["headlines"]}
@@ -204,6 +208,88 @@ def classify_themes(candidates_with_news, client, max_tokens=8000, _retried=Fals
         return classify_themes(candidates_with_news, client, max_tokens=max_tokens * 2, _retried=True)
     text = next(b.text for b in response.content if b.type == "text")
     return json.loads(text)["groups"]
+
+
+CONSOLIDATE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "canonical_groups": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "canonical_theme": {"type": "string"},
+                    "member_ids": {"type": "array", "items": {"type": "integer"}},
+                },
+                "required": ["canonical_theme", "member_ids"],
+                "additionalProperties": False
+            }
+        }
+    },
+    "required": ["canonical_groups"],
+    "additionalProperties": False
+}
+
+CONSOLIDATE_SYSTEM_PROMPT = """여러 배치로 나뉘어 각각 독립적으로 분류된 테마 그룹 목록이 주어진다.
+각 그룹은 id, 테마명, 소속 종목명 목록을 가진다.
+
+규칙:
+- 같은 테마를 가리키는 그룹(이름이 다르게 붙었거나 배치 경계 때문에 쪼개진 경우 포함)을
+  하나의 canonical_theme으로 합쳐라. 서로 무관한 테마는 합치지 말고 그대로 둔다.
+- 통합된 테마명은 간결한 한국어로 짓는다.
+- 입력된 모든 id는 정확히 한 번씩 결과에 포함되어야 한다 (누락 금지, 중복 금지)."""
+
+
+def consolidate_groups(groups, client, max_tokens=4000, _retried=False):
+    """배치별로 독립 호출된 결과라 같은 테마가 다른 이름으로 쪼개질 수 있어, 종목명만
+    가지고 가벼운 2차 호출로 테마명을 병합한다 (원본 종목 데이터는 건드리지 않음)."""
+    items = [
+        {"id": i, "theme": g["theme"], "stocks": [s["name"] for s in g["stocks"]]}
+        for i, g in enumerate(groups)
+    ]
+    user_payload = json.dumps(items, ensure_ascii=False)
+
+    response = client.messages.create(
+        model=MODEL,
+        max_tokens=max_tokens,
+        system=CONSOLIDATE_SYSTEM_PROMPT,
+        output_config={"format": {"type": "json_schema", "schema": CONSOLIDATE_SCHEMA}},
+        messages=[{"role": "user", "content": user_payload}],
+    )
+    if response.stop_reason == "refusal":
+        raise RuntimeError(f"Claude refused (consolidate): {response.stop_details}")
+    if response.stop_reason == "max_tokens":
+        if _retried:
+            raise RuntimeError(f"Claude output truncated even after retry (consolidate, max_tokens={max_tokens})")
+        return consolidate_groups(groups, client, max_tokens=max_tokens * 2, _retried=True)
+    text = next(b.text for b in response.content if b.type == "text")
+    canonical = json.loads(text)["canonical_groups"]
+
+    merged = []
+    seen_ids = set()
+    for c in canonical:
+        stocks = []
+        for gid in c["member_ids"]:
+            if gid in seen_ids or not (0 <= gid < len(groups)):
+                continue  # 중복 배정/범위 밖 id는 무시 (환각 방지)
+            seen_ids.add(gid)
+            stocks.extend(groups[gid]["stocks"])
+        if stocks:
+            merged.append({"theme": c["canonical_theme"], "stocks": stocks})
+    for i, g in enumerate(groups):
+        if i not in seen_ids:
+            merged.append(g)  # 모델이 누락한 그룹은 원래 이름 그대로 보존
+    return merged
+
+
+def classify_all_themes(candidates, client):
+    batches = [candidates[i:i + CLASSIFY_BATCH_SIZE] for i in range(0, len(candidates), CLASSIFY_BATCH_SIZE)]
+    if len(batches) == 1:
+        return classify_themes(batches[0], client)
+    with ThreadPoolExecutor(max_workers=min(len(batches), CLASSIFY_WORKERS)) as ex:
+        batch_results = list(ex.map(lambda b: classify_themes(b, client), batches))
+    all_groups = [g for groups in batch_results for g in groups]
+    return consolidate_groups(all_groups, client)
 
 
 def merge_groups(groups, candidates_by_code):
@@ -286,7 +372,7 @@ def main():
             c["headlines"] = headlines.get(c["code"], [])
 
         client = anthropic.Anthropic()
-        groups = classify_themes(candidates, client)
+        groups = classify_all_themes(candidates, client)
         candidates_by_code = {c["code"]: c for c in candidates}
         groups = merge_groups(groups, candidates_by_code)
 
