@@ -257,7 +257,7 @@
         <div class="row2" style="margin-top:8px;">
           <div>
             <label>종목코드</label>
-            <input type="text" id="p-code" placeholder="005930">
+            <input type="text" id="p-code" placeholder="005930" onblur="autoClassifyTheme()">
           </div>
           <div></div>
         </div>
@@ -286,7 +286,7 @@
           </div>
         </div>
         <div style="margin-top:8px;">
-          <label>테마 <span style="color:var(--muted);font-weight:400;">(최대 2개, 미장 프리마켓 체크용)</span></label>
+          <label>테마 <span style="color:var(--muted);font-weight:400;">(최대 2개, 미장 프리마켓 체크용)</span> <span id="p-theme-ai-status" style="color:var(--blue);font-weight:400;"></span></label>
           <div class="pills" id="p-theme-pills"></div>
         </div>
         <button class="save-btn" style="margin-top:12px;" onclick="addPlanAndSwitch()">+ 목록에 추가</button>
@@ -600,6 +600,7 @@
 
   const THEME_OPTIONS = ['반도체장비','메모리반도체','AI반도체','반도체소재부품','2차전지','바이오','방산','조선','원전','로봇','소프트웨어/AI서비스','사이버보안','금융','에너지/정유','우주항공','엔터','화장품','게임','정치테마','기타(미장무관)'];
   let planThemes = []; // 계획 추가 폼에서 선택한 테마 (최대 2개)
+  let lastClassifiedCode = null; // 테마 자동분류 중복 호출 방지용
 
   function renderThemePills() {
     document.getElementById('p-theme-pills').innerHTML = THEME_OPTIONS.map(t =>
@@ -644,6 +645,27 @@
       planThemes.push(theme);
       el.classList.add('active');
     }
+  }
+
+  function autoClassifyTheme() {
+    const name = document.getElementById('p-name').value.trim();
+    const code = document.getElementById('p-code').value.trim();
+    const statusEl = document.getElementById('p-theme-ai-status');
+    if (!name || !code || code === lastClassifiedCode) return;
+    if (planThemes.length > 0) return; // 이미 수동으로 선택했으면 덮어쓰지 않음
+    lastClassifiedCode = code;
+    if (statusEl) statusEl.textContent = 'AI 분류 중...';
+    fetch(`${APPS_SCRIPT_URL}?action=classifyTheme&name=${encodeURIComponent(name)}&code=${encodeURIComponent(code)}`)
+      .then(r => r.json())
+      .then(result => {
+        if (statusEl) statusEl.textContent = '';
+        if (planThemes.length > 0) return; // 응답 오는 사이 사용자가 수동 선택했으면 무시
+        (result.themes || []).forEach(theme => {
+          const el = document.querySelector(`#p-theme-pills .pill[data-theme="${theme}"]`);
+          if (el && planThemes.indexOf(theme) < 0) togglePlanTheme(theme, el);
+        });
+      })
+      .catch(err => { if (statusEl) statusEl.textContent = ''; console.warn('테마 자동분류 실패', err); });
   }
 
   /* ── 탭 전환 ── */
@@ -863,6 +885,7 @@
     planRegime = null;
     document.querySelectorAll('#subtab-add .regime-btn').forEach(b => b.classList.remove('active','r-up','r-box','r-down'));
     planThemes = [];
+    lastClassifiedCode = null;
     document.querySelectorAll('#p-theme-pills .pill').forEach(el => el.classList.remove('active'));
     p2manual = false;
     fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ type: 'plan-save', plan }) });

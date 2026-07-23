@@ -17,6 +17,9 @@ function doGet(e) {
   if (action === 'getThemeHistory') {
     return getThemeHistory_(ss, e.parameter.date, e.parameter.limit);
   }
+  if (action === 'classifyTheme') {
+    return classifyTheme_(e.parameter.name, e.parameter.code);
+  }
 
   const sheet = ss.getSheetByName('Plans');
   if (!sheet) return ContentService.createTextOutput(JSON.stringify([])).setMimeType(ContentService.MimeType.JSON);
@@ -86,6 +89,70 @@ function getThemeHistory_(ss, dateStr, limitStr) {
     if (!dateStr && limit && out.length >= limit) break;
   }
   return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+}
+
+// ---- 매매계획 테마 자동분류 (Claude API) ----
+
+// index.html의 THEME_OPTIONS와 동일한 목록이어야 한다 — 둘 중 하나를 바꾸면 반드시 같이 수정할 것.
+var THEME_OPTIONS_ = ['반도체장비', '메모리반도체', 'AI반도체', '반도체소재부품', '2차전지', '바이오', '방산', '조선', '원전', '로봇', '소프트웨어/AI서비스', '사이버보안', '금융', '에너지/정유', '우주항공', '엔터', '화장품', '게임', '정치테마', '기타(미장무관)'];
+
+function classifyTheme_(name, code) {
+  try {
+    if (!name || !code) {
+      return ContentService.createTextOutput(JSON.stringify({ themes: [] })).setMimeType(ContentService.MimeType.JSON);
+    }
+    var apiKey = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY');
+    if (!apiKey) {
+      return ContentService.createTextOutput(JSON.stringify({ themes: [], error: 'no_api_key' })).setMimeType(ContentService.MimeType.JSON);
+    }
+    var payload = {
+      model: 'claude-sonnet-5',
+      max_tokens: 200,
+      system: '너는 한국 주식 종목을 아래 20개 테마 카테고리 중 최대 2개로 분류하는 도우미다. ' +
+        '테마 목록: ' + THEME_OPTIONS_.join(', ') + '. ' +
+        '주어진 종목명/종목코드를 보고 가장 관련 있는 테마를 관련도 순으로 최대 2개 골라라. ' +
+        '뚜렷하게 관련된 테마가 없으면 빈 배열을 반환해라. 반드시 위 목록에 있는 테마명만 그대로 사용해라.',
+      messages: [
+        { role: 'user', content: '종목명: ' + name + ', 종목코드: ' + code }
+      ],
+      output_config: {
+        format: {
+          type: 'json_schema',
+          schema: {
+            type: 'object',
+            properties: {
+              themes: {
+                type: 'array',
+                items: { type: 'string', enum: THEME_OPTIONS_ }
+              }
+            },
+            required: ['themes'],
+            additionalProperties: false
+          }
+        }
+      }
+    };
+    var res = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+    if (res.getResponseCode() !== 200) {
+      // 디버깅용으로 API 응답 본문 앞부분을 같이 반환한다 — 원인 파악 후 나중에 줄여도 됨.
+      return ContentService.createTextOutput(JSON.stringify({ themes: [], error: 'api_error_' + res.getResponseCode() + ': ' + res.getContentText().slice(0, 300) })).setMimeType(ContentService.MimeType.JSON);
+    }
+    var body = JSON.parse(res.getContentText());
+    var textBlock = (body.content || []).filter(function (b) { return b.type === 'text'; })[0];
+    if (!textBlock) {
+      return ContentService.createTextOutput(JSON.stringify({ themes: [], error: 'no_text_block' })).setMimeType(ContentService.MimeType.JSON);
+    }
+    var parsed = JSON.parse(textBlock.text);
+    return ContentService.createTextOutput(JSON.stringify({ themes: (parsed.themes || []).slice(0, 2) })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ themes: [], error: String(err) })).setMimeType(ContentService.MimeType.JSON);
+  }
 }
 
 // ---- 키움 자동 매매일지 동기화 (읽기 전용 조회 데이터만 기록 — 주문 관련 아님) ----
